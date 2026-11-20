@@ -11,8 +11,8 @@ android {
         applicationId = "uz.xasanboy.optom"
         minSdk = 23
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
     }
 
     // Doimiy imzo kaliti — yangi versiyalar eski ilova ustidan (ma'lumotlar saqlangan holda) o'rnatiladi
