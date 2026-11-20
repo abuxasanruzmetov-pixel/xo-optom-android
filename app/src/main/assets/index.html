@@ -21,8 +21,18 @@
       padding: 0;
       background-color: #f4f5f9;
       color: #0f172a;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Android WebView'da sahifa surilishi uchun: aniq scroll konteyner */
+    #app-shell {
+      height: 100vh;
+      height: 100dvh;
       overflow-x: hidden;
-      overscroll-behavior-y: none;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
     }
 
     @keyframes scanSweep {
@@ -380,9 +390,14 @@
 
     function setActiveTab(tabId) {
       if (!DEFAULT_NAV_ORDER.includes(tabId)) return;
+      const changed = appState.activeTab !== tabId;
       appState.activeTab = tabId;
       saveAppState();
       renderAll();
+      if (changed) {
+        const shell = document.getElementById('app-shell');
+        if (shell) shell.scrollTop = 0;
+      }
     }
 
     // =========================================================================

@@ -11,12 +11,26 @@ android {
         applicationId = "uz.xasanboy.optom"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+
+    // Doimiy imzo kaliti — yangi versiyalar eski ilova ustidan (ma'lumotlar saqlangan holda) o'rnatiladi
+    signingConfigs {
+        create("xo") {
+            storeFile = file("xo-key.jks")
+            storePassword = "xoptom2026"
+            keyAlias = "xo"
+            keyPassword = "xoptom2026"
+        }
     }
 
     buildTypes {
-        release { isMinifyEnabled = false }
+        getByName("debug") { signingConfig = signingConfigs.getByName("xo") }
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("xo")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
