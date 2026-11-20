@@ -123,8 +123,8 @@
     <!-- Yuqori sarlavha paneli -->
     <header id="global-app-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200/80 px-3.5 py-2.5 flex items-center justify-between gap-2">
       <div class="flex items-center gap-2.5 min-w-0">
-        <button type="button" onclick="setActiveTab('asosiy')" title="XASANBOY_OPTOM Asosiy" class="w-10 h-10 rounded-2xl bg-[#5b3df5] hover:bg-[#4b2fe0] text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm active:scale-95 transition">
-          XO
+        <button id="header-brand-btn" type="button" onclick="setActiveTab('asosiy')" title="XASANBOY_OPTOM Asosiy" class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm active:scale-95 transition">
+          <span class="w-10 h-10 rounded-2xl bg-[#5b3df5] text-white font-black text-sm flex items-center justify-center">XO</span>
         </button>
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 flex-wrap">
@@ -143,7 +143,7 @@
         <button type="button" onclick="confirmResetEmptyDb()" title="100% Pustoy bazaga qaytarish" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-sm font-bold">
           🗑️
         </button>
-        <button type="button" onclick="toggleSalespersonRoleMode()" title="Sotuvchi / Egasi rejimini almashtirish" class="w-9 h-9 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
+        <button type="button" onclick="openAccountMenu()" title="Hisob / Chiqish" class="w-9 h-9 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
           🔐
         </button>
       </div>
@@ -196,6 +196,7 @@
         mode: 'auto', // 'auto' | 'ble' | 'rawbt' | 'native' | 'system'
         connectionType: 'Bluetooth',
         escposQr: false,
+        showLogo: true,
         receiptStyle: 'image', // 'image' (chiroyli, pdaftar uslubi) | 'text' (tez)
         paperSize: '80mm',
         receiptLayout: 'list',
@@ -218,6 +219,8 @@
         role: 'owner', // 'owner' | 'salesperson'
         pinCode: '1234',
         receiptCounter: 0,
+        users: [],
+        loginLog: [],
         store: {
           name: 'XASANBOY_OPTOM',
           phone: '',
@@ -285,6 +288,8 @@
             name: (parsed.store?.name || 'XASANBOY_OPTOM').trim() || 'XASANBOY_OPTOM',
             sellerName: (parsed.store?.sellerName || 'Xasanboy').trim() || 'Xasanboy'
           },
+          users: Array.isArray(parsed.users) ? parsed.users : [],
+          loginLog: Array.isArray(parsed.loginLog) ? parsed.loginLog : [],
           products: Array.isArray(parsed.products) ? parsed.products : [],
           clients: Array.isArray(parsed.clients) ? parsed.clients : [],
           suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [],
@@ -384,7 +389,7 @@
 
     function guardOwnerAction(actionLabel = "Bu amal faqat Egasi rejimida bajariladi") {
       if (!isSalespersonMode()) return true;
-      showToast(`${actionLabel}. Profil yoki 🔐 tugmasidan Egasi rejimiga o'ting.`, 'error');
+      showToast(`${actionLabel}. Egasi hisobi bilan kiring.`, 'error');
       return false;
     }
 
@@ -533,12 +538,15 @@
           fresh.pinCode = appState.pinCode;
           fresh.role = appState.role;
           fresh.navOrder = [...appState.navOrder];
+          fresh.users = getUsers();
+          fresh.loginLog = Array.isArray(appState.loginLog) ? appState.loginLog : [];
           fresh.printer = {
             ...createDefaultPrinterConfig(),
             ...(appState.printer || {}),
             pairedDevices: [...(appState.printer?.pairedDevices || [])]
           };
           appState = fresh;
+          imgClearAll(true).then(() => renderAll());
           saveAppState();
           renderAll();
           showToast("Baza 100% pustoy (0) holatga qaytarildi", 'success');
@@ -836,17 +844,20 @@
       if (titleEl) titleEl.textContent = appState.store.name || 'XASANBOY_OPTOM';
       if (subEl) {
         const parts = ['100% Pustoy baza'];
-        if (appState.store.sellerName) parts.push(`Sotuvchi: ${appState.store.sellerName}`);
+        const who = currentUser ? currentUser.name : appState.store.sellerName;
+        if (who) parts.push(`${currentUser && currentUser.role === 'owner' ? 'Egasi' : 'Sotuvchi'}: ${who}`);
         if (appState.store.phone) parts.push(appState.store.phone);
         subEl.textContent = parts.join(' • ');
       }
+      const brandBtn = document.getElementById('header-brand-btn');
+      if (brandBtn) brandBtn.innerHTML = renderBrandBadgeHtml('w-10 h-10', 'text-sm');
       if (roleBadge) {
         if (isSalespersonMode()) {
-          roleBadge.textContent = 'Sotuvchi';
-          roleBadge.className = 'px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold shrink-0';
+          roleBadge.textContent = currentUser ? currentUser.name : 'Sotuvchi';
+          roleBadge.className = 'px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold shrink-0 max-w-[110px] truncate';
         } else {
-          roleBadge.textContent = 'Egasi';
-          roleBadge.className = 'px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold shrink-0';
+          roleBadge.textContent = currentUser ? currentUser.name : 'Egasi';
+          roleBadge.className = 'px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold shrink-0 max-w-[110px] truncate';
         }
       }
 
@@ -1012,7 +1023,8 @@
             <div class="divide-y divide-slate-100">
               ${filtered.map(prod => `
                 <div class="p-3.5 flex items-start justify-between gap-2.5">
-                  <div class="min-w-0">
+                  ${getProductImage(prod.id) ? `<img src="${getProductImage(prod.id)}" alt="" loading="lazy" class="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-200" />` : ''}
+                  <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5 flex-wrap">
                       <button type="button" onclick="toggleProductFavorite('${prod.id}')" title="Tanlangan" class="text-sm leading-none ${prod.favorite ? 'text-amber-400' : 'text-slate-300'}">${prod.favorite ? '★' : '☆'}</button>
                       <span class="text-xs font-black text-slate-900">${escapeHtml(prod.name)}</span>
@@ -1086,9 +1098,12 @@
       showToast(`Yangi qoldiq: ${prod.qty} ${prod.unit || 'dona'}`, 'success');
     }
 
+    let keepProductImageDraft = false;
     function openProductModal(editProductId = null, prefillBarcode = '') {
       const existing = editProductId ? appState.products.find(p => p.id === editProductId) : null;
       if (existing && !guardOwnerAction("Mahsulotni tahrirlash faqat Egasi rejimida mumkin")) return;
+      if (!keepProductImageDraft) productImageDraft = undefined;
+      keepProductImageDraft = false;
 
       const selectedSupId = existing?.supplierId || '';
       const selectedSupObj = appState.suppliers.find(s => s.id === selectedSupId) || null;
@@ -1102,6 +1117,8 @@
             <label class="block text-xs font-bold text-slate-700 mb-1">Mahsulot nomi *</label>
             <input id="prod-name" type="text" required value="${escapeHtml(existing?.name || '')}" placeholder="Masalan: Shakar 50kg / Yog' 5L" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
           </div>
+
+          ${renderProductImagePickerHtml(existing ? existing.id : '')}
 
           <div class="grid grid-cols-2 gap-2.5">
             <div>
@@ -1392,13 +1409,15 @@
         }
         saveAppState();
         closeAppModal();
+        commitProductImageDraft(editProductId).then(() => renderActiveTab());
         renderActiveTab();
         showToast("Mahsulot yangilandi", 'success');
         return;
       }
 
+      const newProductId = uid('prod');
       appState.products.unshift({
-        id: uid('prod'),
+        id: newProductId,
         name,
         category,
         unit,
@@ -1448,6 +1467,7 @@
 
       saveAppState();
       closeAppModal();
+      commitProductImageDraft(newProductId).then(() => renderActiveTab());
       renderActiveTab();
       showToast("Mahsulot omborga qo'shildi", 'success');
     }
@@ -1463,6 +1483,7 @@
         "O'chirish",
         () => {
           appState.products = appState.products.filter(p => p.id !== productId);
+          imgDel('p_' + productId);
           saveAppState();
           renderActiveTab();
           showToast("Mahsulot o'chirildi", 'info');
@@ -1610,6 +1631,7 @@
       stopCameraScanner();
       const stash = productFormStash;
       productFormStash = null;
+      keepProductImageDraft = true;
       openProductModal(stash?.editId || null, code || '');
       if (!stash) return;
       Object.entries(stash.values).forEach(([id, val]) => {
@@ -1835,7 +1857,8 @@
                   const cartQty = inCart ? Number(inCart.qty) || 0 : 0;
                   return `
                     <div onclick="handlePosProductTap('${prod.id}')" class="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 cursor-pointer transition">
-                      <div class="min-w-0">
+                      ${getProductImage(prod.id) ? `<img src="${getProductImage(prod.id)}" alt="" loading="lazy" class="w-11 h-11 rounded-xl object-cover shrink-0 border border-slate-200" />` : ''}
+                      <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-1.5">
                           <button type="button" onclick="event.stopPropagation(); toggleProductFavorite('${prod.id}');" class="text-sm ${prod.favorite ? 'text-amber-400' : 'text-slate-300'}">${prod.favorite ? '★' : '☆'}</button>
                           <span class="text-xs font-extrabold text-slate-900 truncate">${escapeHtml(prod.name)}</span>
@@ -1862,14 +1885,18 @@
                       onclick="handlePosProductTap('${prod.id}')"
                       class="relative rounded-xl overflow-hidden bg-white border border-slate-200 shadow-sm cursor-pointer active:scale-[0.98] transition flex flex-col"
                     >
-                      <div class="aspect-square w-full bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center p-2 text-center relative">
+                      <div class="aspect-square w-full bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center p-2 text-center relative overflow-hidden">
+                        ${getProductImage(prod.id) ? `<img src="${getProductImage(prod.id)}" alt="" loading="lazy" class="absolute inset-0 w-full h-full object-cover" />` : ''}
+                        ${getProductImage(prod.id) ? `<span class="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md bg-black/55 text-white text-[9.5px] font-bold">${Number(prod.qty) || 0} ${escapeHtml(prod.unit || 'dona')}</span>` : ''}
                         ${cartQty > 0 ? `
-                          <span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-[#5b3df5] text-white text-[10px] font-black shadow">
+                          <span class="absolute top-1.5 right-1.5 z-10 px-1.5 py-0.5 rounded-md bg-[#5b3df5] text-white text-[10px] font-black shadow">
                             ${cartQty}x
                           </span>
                         ` : ''}
-                        <span class="text-xs font-black text-slate-700 line-clamp-2">${escapeHtml((prod.name || 'XO').slice(0, 12))}</span>
-                        <span class="text-[10px] font-bold text-slate-500 mt-1">Qoldiq: ${Number(prod.qty) || 0} ${escapeHtml(prod.unit || 'dona')}</span>
+                        ${getProductImage(prod.id) ? '' : `
+                          <span class="text-xs font-black text-slate-700 line-clamp-2">${escapeHtml((prod.name || 'XO').slice(0, 12))}</span>
+                          <span class="text-[10px] font-bold text-slate-500 mt-1">Qoldiq: ${Number(prod.qty) || 0} ${escapeHtml(prod.unit || 'dona')}</span>
+                        `}
                       </div>
 
                       <div class="bg-[#2f3548] text-white px-2 py-1.5 flex-1 flex flex-col justify-between">
@@ -2308,7 +2335,8 @@
         clientPhone: client ? (client.phone || '') : '',
         clientDebtBefore: prevDebt,
         clientDebtAfter: nextDebt,
-        sellerName: appState.store.sellerName || 'Xasanboy',
+        sellerName: getCurrentSellerName(),
+        sellerId: currentUser ? currentUser.id : '',
         paymentMethodRaw: channel,
         paymentType: creditDebt > 0 && paidNow > 0 ? `${channel} + Nasiya` : (creditDebt > 0 ? 'Nasiya' : channel),
         paidAmount: paidNow,
@@ -3327,9 +3355,13 @@
       return `
         <div style="font-family:'Inter',sans-serif;color:#0f172a;">
           <div style="display:flex;align-items:center;gap:10px;padding-bottom:8px;">
-            <div style="width:42px;height:42px;border-radius:12px;background:#5b3df5;color:#fff;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              XO
-            </div>
+            ${pr.showLogo !== false && getStoreLogo() ? `
+              <img src="${getStoreLogo()}" alt="" style="width:52px;height:52px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;" />
+            ` : `
+              <div style="width:42px;height:42px;border-radius:12px;background:#5b3df5;color:#fff;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                XO
+              </div>
+            `}
             <div style="min-width:0;">
               <div style="font-weight:900;font-size:15px;color:#0f172a;">${escapeHtml(storeTitle)}</div>
               ${storePhone ? `<div style="font-size:11.5px;font-weight:700;color:#64748b;">${escapeHtml(storePhone)}</div>` : ''}
@@ -3952,6 +3984,19 @@
       const prevDebt = Number(sale.clientDebtBefore) || 0;
       const nextDebt = Number(sale.clientDebtAfter) || 0;
       let y = 6;
+
+      // Logo (galereyadan yuklangan)
+      const logoSrc = pr.showLogo !== false ? getStoreLogo() : '';
+      if (logoSrc) {
+        try {
+          const logoImg = await loadImageEl(logoSrc);
+          const maxW = W * 0.62, maxH = 120;
+          const k = Math.min(maxW / logoImg.width, maxH / logoImg.height);
+          const lw = logoImg.width * k, lh = logoImg.height * k;
+          ctx.drawImage(logoImg, (W - lw) / 2, y + 4, lw, lh);
+          y += lh + 6;
+        } catch (_) {}
+      }
 
       // Sarlavha
       font(26, 700);
@@ -4608,6 +4653,8 @@
             </div>
           </div>
 
+          ${renderLogoSettingsHtml()}
+
           <div>
             <label class="block text-xs font-bold text-slate-500 mb-1.5">Termal chek turi</label>
             <div class="grid grid-cols-2 gap-2">
@@ -4973,7 +5020,7 @@
         clientPhone: '',
         clientDebtBefore: 0,
         clientDebtAfter: 0,
-        sellerName: appState.store.sellerName || 'Xasanboy',
+        sellerName: getCurrentSellerName(),
         paymentMethodRaw: 'Naqd',
         paymentType: 'Naqd',
         paidAmount: 10000,
@@ -5074,12 +5121,8 @@
                 <input id="prof-store-address" type="text" value="${escapeHtml(appState.store.address || '')}" placeholder="Manzil" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Egasi PIN-kodi (4 raqam)</label>
-                ${isSalespersonMode() ? `
-                  <div class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-mono font-bold text-slate-400">•••• (yashirin)</div>
-                ` : `
-                  <input id="prof-pin-code" type="password" inputmode="numeric" maxlength="4" pattern="\\d{4}" placeholder="O'zgartirmaslik uchun bo'sh qoldiring" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold" />
-                `}
+                <label class="block text-xs font-bold text-slate-700 mb-1">Hisob</label>
+                <button type="button" onclick="openAccountMenu()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-left truncate">👤 ${escapeHtml(currentUser ? currentUser.name : '—')}</button>
               </div>
             </div>
 
@@ -5095,9 +5138,9 @@
             <button type="button" onclick="resetNavOrder()" class="text-xs font-extrabold text-[#5b3df5] hover:underline">Panelni tiklash</button>
           </div>
 
-          <button type="button" onclick="toggleSalespersonRoleMode()" class="w-full py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-extrabold flex items-center justify-between">
-            <span>🔐 Rolni almashtirish (Hozir: ${isSalespersonMode() ? 'Sotuvchi' : 'Egasi'})</span>
-            <span>${isSalespersonMode() ? "Egasi →" : "Sotuvchi →"}</span>
+          <button type="button" onclick="openAccountMenu()" class="w-full py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-extrabold flex items-center justify-between">
+            <span>👤 ${escapeHtml(currentUser ? currentUser.name : '')} (${isSalespersonMode() ? 'Sotuvchi' : 'Egasi'})</span>
+            <span>Hisob / Chiqish →</span>
           </button>
 
           <button type="button" onclick="openPrinterModal()" class="w-full py-2.5 px-3 rounded-xl bg-violet-50 hover:bg-violet-100 text-[#5b3df5] border border-violet-200 text-xs font-extrabold flex items-center justify-between">
@@ -5105,6 +5148,10 @@
             <span>Ochish →</span>
           </button>
         </div>
+
+        ${isSalespersonMode() ? '' : renderLogoSettingsHtml()}
+
+        ${renderStaffSectionHtml()}
 
         <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm space-y-2.5">
           <div class="flex items-center justify-between">
@@ -5158,19 +5205,27 @@
       showToast("Profil sozlamalari saqlandi", 'success');
     }
 
+    function buildBackupJson() {
+      const images = {};
+      imgCache.forEach((v, k) => { images[k] = v; });
+      return JSON.stringify({ ...appState, __images: images, __backupAt: formatDateNow() });
+    }
+
     function exportBackupJson() {
+      if (!guardOwnerAction("Zaxira olish faqat Egasi uchun")) return;
       const fileName = `XASANBOY_OPTOM_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      const json = buildBackupJson();
       if (window.AndroidPrinter && typeof window.AndroidPrinter.saveTextFile === 'function') {
-        const ok = window.AndroidPrinter.saveTextFile(fileName, JSON.stringify(appState, null, 2));
+        const ok = window.AndroidPrinter.saveTextFile(fileName, json);
         showToast(ok ? "Zaxira Yuklanmalar papkasiga saqlandi" : "Saqlashda xatolik", ok ? 'success' : 'error');
         return;
       }
       try {
-        const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
+        const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `XASANBOY_OPTOM_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -5184,15 +5239,33 @@
 
     function importBackupJson(e) {
       const file = e.target?.files?.[0];
+      e.target.value = '';
       if (!file) return;
+      if (!guardOwnerAction("Zaxirani tiklash faqat Egasi uchun")) return;
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         try {
           const parsed = JSON.parse(String(reader.result || ''));
           if (!parsed || typeof parsed !== 'object') throw new Error('Invalid JSON');
+          const images = parsed.__images && typeof parsed.__images === 'object' ? parsed.__images : null;
+          delete parsed.__images;
+          delete parsed.__backupAt;
+          // Eski zaxirada hisoblar bo'lmasa — joriy hisoblar saqlanadi
+          if (!Array.isArray(parsed.users) || parsed.users.length === 0) {
+            parsed.users = getUsers();
+            parsed.loginLog = Array.isArray(appState.loginLog) ? appState.loginLog : [];
+          }
           localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
           appState = loadAppState();
+          if (images) {
+            await imgClearAll(false);
+            for (const [k, v] of Object.entries(images)) {
+              if (typeof v === 'string' && v.startsWith('data:image')) await imgPut(k, v);
+            }
+          }
+          saveAppState();
           renderAll();
+          initAuthGate();
           showToast("Zaxira baza muvaffaqiyatli yuklandi", 'success');
         } catch (err) {
           console.warn('Import error:', err);
@@ -5200,7 +5273,767 @@
         }
       };
       reader.readAsText(file);
+    }
+
+    // =========================================================================
+    // 15b. RASMLAR OMBORI (IndexedDB) — mahsulot rasmlari va chek logosi
+    //      localStorage'ni og'irlashtirmaslik uchun rasmlar alohida saqlanadi
+    // =========================================================================
+    const IMG_DB_NAME = 'xasanboy_optom_images';
+    const IMG_STORE = 'img';
+    const LOGO_KEY = '__store_logo';
+    const imgCache = new Map();
+    let imgDbPromise = null;
+
+    function imgDb() {
+      if (imgDbPromise) return imgDbPromise;
+      imgDbPromise = new Promise((resolve, reject) => {
+        try {
+          const req = indexedDB.open(IMG_DB_NAME, 1);
+          req.onupgradeneeded = () => req.result.createObjectStore(IMG_STORE);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        } catch (err) {
+          reject(err);
+        }
+      });
+      return imgDbPromise;
+    }
+
+    async function imgTx(mode, fn) {
+      const db = await imgDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IMG_STORE, mode);
+        const store = tx.objectStore(IMG_STORE);
+        let result;
+        Promise.resolve(fn(store)).then(r => { result = r; });
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    }
+
+    async function imgPut(key, dataUrl) {
+      imgCache.set(key, dataUrl);
+      try { await imgTx('readwrite', s => s.put(dataUrl, key)); } catch (err) { console.warn('imgPut', err); }
+    }
+
+    async function imgDel(key) {
+      imgCache.delete(key);
+      try { await imgTx('readwrite', s => s.delete(key)); } catch (err) { console.warn('imgDel', err); }
+    }
+
+    async function imgClearAll(keepLogo = true) {
+      const logo = imgCache.get(LOGO_KEY);
+      imgCache.clear();
+      try { await imgTx('readwrite', s => s.clear()); } catch (err) { console.warn('imgClear', err); }
+      if (keepLogo && logo) await imgPut(LOGO_KEY, logo);
+    }
+
+    async function imgLoadAll() {
+      try {
+        const db = await imgDb();
+        await new Promise((resolve) => {
+          const tx = db.transaction(IMG_STORE, 'readonly');
+          const req = tx.objectStore(IMG_STORE).openCursor();
+          req.onsuccess = () => {
+            const cur = req.result;
+            if (cur) { imgCache.set(String(cur.key), cur.value); cur.continue(); }
+          };
+          tx.oncomplete = resolve;
+          tx.onerror = resolve;
+        });
+      } catch (err) {
+        console.warn('imgLoadAll', err);
+      }
+    }
+
+    function getProductImage(productId) {
+      return imgCache.get('p_' + productId) || '';
+    }
+
+    function getStoreLogo() {
+      return imgCache.get(LOGO_KEY) || '';
+    }
+
+    // Tanlangan rasmni kichraytirib dataURL qilish
+    function fileToResizedDataUrl(file, maxSide = 320, type = 'image/jpeg', quality = 0.78, background = '#ffffff') {
+      return new Promise((resolve, reject) => {
+        if (!file) return reject(new Error('Fayl tanlanmadi'));
+        if (!/^image\//.test(file.type || '') && !/\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name || '')) {
+          return reject(new Error('Faqat rasm faylini tanlang'));
+        }
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Faylni o'qib bo'lmadi"));
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error("Rasm formati qo'llab-quvvatlanmaydi"));
+          img.onload = () => {
+            const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+            const w = Math.max(1, Math.round(img.width * scale));
+            const h = Math.max(1, Math.round(img.height * scale));
+            const c = document.createElement('canvas');
+            c.width = w;
+            c.height = h;
+            const ctx = c.getContext('2d');
+            if (background) { ctx.fillStyle = background; ctx.fillRect(0, 0, w, h); }
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(c.toDataURL(type, quality));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadImageEl(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    // ---- Chek logosi ----
+    async function handleLogoFileSelected(e) {
+      const file = e.target?.files?.[0];
       e.target.value = '';
+      if (!file) return;
+      try {
+        const dataUrl = await fileToResizedDataUrl(file, 480, 'image/png', 1, '#ffffff');
+        await imgPut(LOGO_KEY, dataUrl);
+        appState.printer.showLogo = true;
+        saveAppState();
+        renderAll();
+        if (document.getElementById('printer-logo-box')) reopenPrinterModalKeepScroll();
+        showToast("Logo saqlandi", 'success');
+      } catch (err) {
+        showToast(err.message || "Logoni yuklab bo'lmadi", 'error');
+      }
+    }
+
+    async function removeStoreLogo() {
+      await imgDel(LOGO_KEY);
+      renderAll();
+      if (document.getElementById('printer-logo-box')) reopenPrinterModalKeepScroll();
+      showToast("Logo olib tashlandi", 'info');
+    }
+
+    function renderLogoSettingsHtml() {
+      const logo = getStoreLogo();
+      const pr = appState.printer;
+      return `
+        <div id="printer-logo-box" class="p-3 rounded-2xl bg-white border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-slate-900">🖼️ Chek logosi</span>
+            ${logo ? `
+              <label class="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+                <input type="checkbox" ${pr.showLogo !== false ? 'checked' : ''} onchange="appState.printer.showLogo = this.checked; saveAppState();" class="w-4 h-4 accent-[#5b3df5]" />
+                Chekda ko'rsatish
+              </label>
+            ` : ''}
+          </div>
+          ${logo ? `
+            <div class="p-2 rounded-xl bg-slate-50 border border-slate-100 flex justify-center">
+              <img src="${logo}" alt="Logo" style="max-height:90px;max-width:100%;object-fit:contain;" />
+            </div>
+          ` : `
+            <p class="text-[11px] text-slate-500">Logo chek tepasida, do'kon nomi ustida chiqadi. Oq fonli, aniq rasm eng yaxshi chiqadi.</p>
+          `}
+          <div class="grid ${logo ? 'grid-cols-2' : 'grid-cols-1'} gap-2">
+            <label class="py-2 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-[#5b3df5] text-xs font-extrabold text-center cursor-pointer">
+              ${logo ? '🔄 Almashtirish' : '📁 Galereyadan yuklash'}
+              <input type="file" accept="image/*" onchange="handleLogoFileSelected(event)" class="hidden" />
+            </label>
+            ${logo ? `<button type="button" onclick="removeStoreLogo()" class="py-2 rounded-xl bg-red-50 text-red-600 text-xs font-extrabold">O'chirish</button>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBrandBadgeHtml(sizeCls = 'w-10 h-10', textCls = 'text-sm') {
+      const logo = getStoreLogo();
+      if (logo) {
+        return `<span class="${sizeCls} rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0"><img src="${logo}" alt="" class="w-full h-full object-contain" /></span>`;
+      }
+      return `<span class="${sizeCls} rounded-2xl bg-[#5b3df5] text-white font-black ${textCls} flex items-center justify-center shrink-0">XO</span>`;
+    }
+
+    // ---- Mahsulot rasmi tanlash (tovar formasida) ----
+    // undefined = o'zgarmagan, null = o'chirilsin, string = yangi rasm
+    let productImageDraft = undefined;
+
+    async function handleProductImageSelected(e) {
+      const file = e.target?.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        productImageDraft = await fileToResizedDataUrl(file, 360, 'image/jpeg', 0.78, '#ffffff');
+        updateProductImagePreview();
+      } catch (err) {
+        showToast(err.message || "Rasmni yuklab bo'lmadi", 'error');
+      }
+    }
+
+    function removeProductImageDraft() {
+      productImageDraft = null;
+      updateProductImagePreview();
+    }
+
+    function getProductImageDraftSrc(editId) {
+      if (productImageDraft === null) return '';
+      if (typeof productImageDraft === 'string') return productImageDraft;
+      return editId ? getProductImage(editId) : '';
+    }
+
+    function updateProductImagePreview() {
+      const box = document.getElementById('prod-image-box');
+      if (!box) return;
+      const editId = box.dataset.editId || '';
+      box.innerHTML = renderProductImagePickerInner(getProductImageDraftSrc(editId));
+    }
+
+    function renderProductImagePickerInner(src) {
+      return `
+        <div class="flex items-center gap-3">
+          <div class="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+            ${src ? `<img src="${src}" alt="" class="w-full h-full object-cover" />` : '<span class="text-2xl text-slate-300">📷</span>'}
+          </div>
+          <div class="flex-1 space-y-1.5">
+            <label class="block py-2 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-[#5b3df5] text-xs font-extrabold text-center cursor-pointer">
+              ${src ? '🔄 Rasmni almashtirish' : '📁 Rasm qo\'shish'}
+              <input type="file" accept="image/*" onchange="handleProductImageSelected(event)" class="hidden" />
+            </label>
+            ${src ? `<button type="button" onclick="removeProductImageDraft()" class="w-full py-1.5 rounded-xl bg-red-50 text-red-600 text-[11px] font-extrabold">Rasmni olib tashlash</button>` : '<p class="text-[10.5px] text-slate-400 leading-snug">Rasm savdo bo\'limidagi kartochkada ko\'rinadi</p>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderProductImagePickerHtml(editId) {
+      return `
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Mahsulot rasmi</label>
+          <div id="prod-image-box" data-edit-id="${escapeHtml(editId || '')}" class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200">
+            ${renderProductImagePickerInner(getProductImageDraftSrc(editId))}
+          </div>
+        </div>
+      `;
+    }
+
+    async function commitProductImageDraft(productId) {
+      if (productImageDraft === undefined) return;
+      if (productImageDraft === null) await imgDel('p_' + productId);
+      else await imgPut('p_' + productId, productImageDraft);
+      productImageDraft = undefined;
+    }
+
+    // =========================================================================
+    // 15c. RO'YXATDAN O'TISH VA KIRISH (shu telefonda saqlanadi)
+    // =========================================================================
+    const SESSION_KEY = 'xasanboy_optom_session';
+    let currentUser = null;
+
+    function bufToHex(buf) {
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function hashPassword(password, salt) {
+      const text = `${salt}::${password}`;
+      try {
+        if (window.crypto && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+          const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+          return 'sha256:' + bufToHex(buf);
+        }
+      } catch (_) {}
+      // Zaxira (crypto.subtle bo'lmasa): FNV asosida ko'p martalik aralashtirish
+      let h1 = 0x811c9dc5, h2 = 0x01000193;
+      for (let round = 0; round < 2000; round++) {
+        for (let i = 0; i < text.length; i++) {
+          h1 = Math.imul(h1 ^ text.charCodeAt(i), 16777619);
+          h2 = Math.imul(h2 ^ (h1 >>> 7), 2246822519);
+        }
+      }
+      return 'fnv:' + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+    }
+
+    function makeSalt() {
+      const arr = new Uint8Array(12);
+      try { crypto.getRandomValues(arr); } catch (_) { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256); }
+      return bufToHex(arr);
+    }
+
+    function makeRecoveryCode() {
+      const arr = new Uint32Array(1);
+      try { crypto.getRandomValues(arr); } catch (_) { arr[0] = Math.floor(Math.random() * 1e9); }
+      return String(arr[0] % 1000000).padStart(6, '0');
+    }
+
+    function normalizeLogin(v) {
+      return String(v || '').trim().toLowerCase().replace(/[\s()\-]/g, '');
+    }
+
+    function getUsers() {
+      if (!Array.isArray(appState.users)) appState.users = [];
+      return appState.users;
+    }
+
+    function addLoginLog(user, action) {
+      if (!Array.isArray(appState.loginLog)) appState.loginLog = [];
+      appState.loginLog.unshift({ date: formatDateNow(), userId: user?.id || '', name: user?.name || '?', role: user?.role || '', action });
+      if (appState.loginLog.length > 300) appState.loginLog.length = 300;
+    }
+
+    function readSession() {
+      try {
+        return localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY) || '';
+      } catch (_) { return ''; }
+    }
+
+    function writeSession(userId, remember) {
+      try {
+        localStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_KEY);
+        if (userId) (remember ? localStorage : sessionStorage).setItem(SESSION_KEY, userId);
+      } catch (_) {}
+    }
+
+    function applyCurrentUser(user) {
+      currentUser = user;
+      appState.role = user.role === 'owner' ? 'owner' : 'salesperson';
+      saveAppState();
+    }
+
+    function getCurrentSellerName() {
+      return currentUser?.name || appState.store.sellerName || 'Xasanboy';
+    }
+
+    // Ilova ochilganda: sessiya bo'lsa — davom etamiz, bo'lmasa kirish ekrani
+    function initAuthGate() {
+      const users = getUsers();
+      const sid = readSession();
+      const user = users.find(u => u.id === sid && u.status !== 'pending' && u.status !== 'blocked');
+      if (user) {
+        applyCurrentUser(user);
+        hideAuthScreen();
+        return true;
+      }
+      currentUser = null;
+      showAuthScreen(users.some(u => u.role === 'owner') ? 'login' : 'register');
+      return false;
+    }
+
+    function showAuthScreen(mode = 'login', notice = '') {
+      let el = document.getElementById('auth-screen');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'auth-screen';
+        el.className = 'fixed inset-0 z-[110] bg-[#f4f5f9] overflow-y-auto';
+        document.body.appendChild(el);
+      }
+      const hasOwner = getUsers().some(u => u.role === 'owner');
+      const isRegister = mode === 'register';
+      const isRecover = mode === 'recover';
+      const storeName = appState.store?.name || 'XASANBOY_OPTOM';
+
+      el.innerHTML = `
+        <div class="min-h-full flex flex-col items-center justify-center px-5 py-8">
+          <div class="w-full max-w-sm space-y-5">
+            <div class="flex flex-col items-center gap-2.5">
+              ${renderBrandBadgeHtml('w-20 h-20', 'text-2xl')}
+              <h1 class="text-lg font-black text-slate-900 text-center">${escapeHtml(storeName)}</h1>
+              <p class="text-xs text-slate-500 text-center">
+                ${!hasOwner ? "Birinchi kirish: do'kon egasi hisobini yarating" : isRegister ? "Yangi sotuvchi hisobi" : isRecover ? "Parolni tiklash" : "Hisobingizga kiring"}
+              </p>
+            </div>
+
+            ${hasOwner && !isRecover ? `
+              <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-200/70">
+                <button type="button" onclick="showAuthScreen('login')" class="py-2 rounded-xl text-xs font-extrabold ${!isRegister ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}">Kirish</button>
+                <button type="button" onclick="showAuthScreen('register')" class="py-2 rounded-xl text-xs font-extrabold ${isRegister ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}">Ro'yxatdan o'tish</button>
+              </div>
+            ` : ''}
+
+            ${notice ? `<div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold leading-relaxed">${notice}</div>` : ''}
+
+            <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
+              ${isRecover ? renderRecoverFormHtml() : isRegister || !hasOwner ? renderRegisterFormHtml(!hasOwner) : renderLoginFormHtml()}
+            </div>
+
+            <p class="text-[10.5px] text-slate-400 text-center leading-relaxed">
+              Hisoblar va barcha tarix shu telefonda saqlanadi.
+            </p>
+          </div>
+        </div>
+      `;
+      el.classList.remove('hidden');
+      el.style.display = '';
+      setTimeout(() => el.querySelector('input')?.focus(), 80);
+    }
+
+    function hideAuthScreen() {
+      const el = document.getElementById('auth-screen');
+      if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
+    }
+
+    const AUTH_INPUT = 'w-full px-3.5 py-3 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:border-[#5b3df5]';
+
+    function renderLoginFormHtml() {
+      return `
+        <form onsubmit="handleLoginSubmit(event)" class="space-y-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Login yoki telefon</label>
+            <input id="auth-login" type="text" autocomplete="username" autocapitalize="none" required class="${AUTH_INPUT}" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Parol</label>
+            <input id="auth-pass" type="password" autocomplete="current-password" required class="${AUTH_INPUT}" />
+          </div>
+          <label class="flex items-center gap-2 text-xs font-bold text-slate-600">
+            <input id="auth-remember" type="checkbox" checked class="w-4 h-4 accent-[#5b3df5]" />
+            Meni eslab qol
+          </label>
+          <div id="auth-error" class="hidden p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold"></div>
+          <button type="submit" class="w-full py-3 rounded-2xl bg-[#5b3df5] hover:bg-[#4b2fe0] text-white text-sm font-black">Kirish</button>
+          <button type="button" onclick="showAuthScreen('recover')" class="w-full text-xs font-extrabold text-[#5b3df5]">Parolni unutdingizmi?</button>
+        </form>
+      `;
+    }
+
+    function renderRegisterFormHtml(isOwner) {
+      return `
+        <form onsubmit="handleRegisterSubmit(event)" class="space-y-3">
+          ${isOwner ? `
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Do'kon nomi</label>
+              <input id="auth-store" type="text" value="${escapeHtml(appState.store?.name || 'XASANBOY_OPTOM')}" class="${AUTH_INPUT}" />
+            </div>
+          ` : ''}
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Ismingiz *</label>
+            <input id="auth-name" type="text" required value="${isOwner ? escapeHtml(appState.store?.sellerName || '') : ''}" class="${AUTH_INPUT}" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Login yoki telefon *</label>
+            <input id="auth-login" type="text" autocomplete="username" autocapitalize="none" required placeholder="Masalan: 972030307" class="${AUTH_INPUT}" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Parol *</label>
+              <input id="auth-pass" type="password" autocomplete="new-password" required minlength="4" class="${AUTH_INPUT}" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Takrorlang *</label>
+              <input id="auth-pass2" type="password" autocomplete="new-password" required minlength="4" class="${AUTH_INPUT}" />
+            </div>
+          </div>
+          ${isOwner ? '' : `<p class="text-[11px] text-slate-500 leading-relaxed">Yangi sotuvchi hisobi do'kon egasi tasdiqlagandan keyin ishlaydi.</p>`}
+          <div id="auth-error" class="hidden p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold"></div>
+          <button type="submit" class="w-full py-3 rounded-2xl bg-[#5b3df5] hover:bg-[#4b2fe0] text-white text-sm font-black">
+            ${isOwner ? "Egasi hisobini yaratish" : "Ro'yxatdan o'tish"}
+          </button>
+        </form>
+      `;
+    }
+
+    function renderRecoverFormHtml() {
+      return `
+        <form onsubmit="handleRecoverSubmit(event)" class="space-y-3">
+          <p class="text-[11px] text-slate-600 leading-relaxed">
+            <b>Egasi:</b> ro'yxatdan o'tishda berilgan 6 xonali tiklash kodini kiriting.<br>
+            <b>Sotuvchi:</b> parolni do'kon egasi Profil → Xodimlar bo'limida yangilaydi.
+          </p>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Egasi logini</label>
+            <input id="auth-login" type="text" autocapitalize="none" required class="${AUTH_INPUT}" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Tiklash kodi (6 raqam)</label>
+            <input id="auth-code" type="text" inputmode="numeric" maxlength="6" required class="${AUTH_INPUT} font-mono tracking-widest" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Yangi parol</label>
+            <input id="auth-pass" type="password" minlength="4" required class="${AUTH_INPUT}" />
+          </div>
+          <div id="auth-error" class="hidden p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold"></div>
+          <button type="submit" class="w-full py-3 rounded-2xl bg-[#5b3df5] text-white text-sm font-black">Parolni yangilash</button>
+          <button type="button" onclick="showAuthScreen('login')" class="w-full text-xs font-extrabold text-slate-500">← Kirishga qaytish</button>
+        </form>
+      `;
+    }
+
+    function authError(msg) {
+      const box = document.getElementById('auth-error');
+      if (!box) { showToast(msg, 'error'); return; }
+      box.textContent = msg;
+      box.classList.remove('hidden');
+    }
+
+    async function handleRegisterSubmit(e) {
+      e.preventDefault();
+      const users = getUsers();
+      const isOwner = !users.some(u => u.role === 'owner');
+      const name = (document.getElementById('auth-name')?.value || '').trim();
+      const loginRaw = (document.getElementById('auth-login')?.value || '').trim();
+      const login = normalizeLogin(loginRaw);
+      const pass = document.getElementById('auth-pass')?.value || '';
+      const pass2 = document.getElementById('auth-pass2')?.value || '';
+
+      if (!name || !login) return authError("Ism va loginni kiriting");
+      if (pass.length < 4) return authError("Parol kamida 4 ta belgidan iborat bo'lsin");
+      if (pass !== pass2) return authError("Parollar bir xil emas");
+      if (users.some(u => u.login === login)) return authError("Bu login band. Boshqasini tanlang yoki Kirish bo'limidan kiring");
+
+      const salt = makeSalt();
+      const user = {
+        id: uid('user'),
+        name,
+        login,
+        loginDisplay: loginRaw,
+        salt,
+        passHash: await hashPassword(pass, salt),
+        role: isOwner ? 'owner' : 'salesperson',
+        status: isOwner ? 'active' : 'pending',
+        createdAt: formatDateNow()
+      };
+
+      let recoveryCode = '';
+      if (isOwner) {
+        recoveryCode = makeRecoveryCode();
+        user.recoverySalt = makeSalt();
+        user.recoveryHash = await hashPassword(recoveryCode, user.recoverySalt);
+        const storeName = (document.getElementById('auth-store')?.value || '').trim();
+        if (storeName) appState.store.name = storeName;
+        appState.store.sellerName = name;
+      }
+
+      users.push(user);
+      addLoginLog(user, isOwner ? "Egasi hisobi yaratildi" : "Ro'yxatdan o'tdi (tasdiq kutmoqda)");
+      saveAppState();
+
+      if (!isOwner) {
+        showAuthScreen('login', `✅ <b>${escapeHtml(name)}</b>, hisobingiz yaratildi. Do'kon egasi tasdiqlagach, shu login va parol bilan kira olasiz.`);
+        return;
+      }
+
+      applyCurrentUser(user);
+      writeSession(user.id, true);
+      addLoginLog(user, 'Kirdi');
+      saveAppState();
+      hideAuthScreen();
+      renderAll();
+      openAppModal("🔑 Tiklash kodingiz", `
+        <div class="space-y-3 text-center">
+          <p class="text-xs text-slate-600 leading-relaxed">Parolni unutsangiz, shu kod orqali tiklaysiz. <b>Yozib oling yoki rasmga olib qo'ying</b> — u boshqa ko'rsatilmaydi.</p>
+          <div class="py-4 rounded-2xl bg-violet-50 border border-violet-200 text-3xl font-black tracking-[0.3em] text-[#5b3df5] font-mono">${recoveryCode}</div>
+          <button type="button" onclick="closeAppModal()" class="w-full py-3 rounded-2xl bg-[#5b3df5] text-white text-sm font-black">Yozib oldim</button>
+        </div>
+      `);
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const login = normalizeLogin(document.getElementById('auth-login')?.value);
+      const pass = document.getElementById('auth-pass')?.value || '';
+      const remember = Boolean(document.getElementById('auth-remember')?.checked);
+      const user = getUsers().find(u => u.login === login);
+      if (!user) return authError("Bunday login topilmadi");
+      if ((await hashPassword(pass, user.salt)) !== user.passHash) {
+        addLoginLog(user, "Noto'g'ri parol");
+        saveAppState();
+        return authError("Parol noto'g'ri");
+      }
+      if (user.status === 'pending') return authError("Hisobingiz hali tasdiqlanmagan. Do'kon egasiga murojaat qiling");
+      if (user.status === 'blocked') return authError("Hisobingiz bloklangan. Do'kon egasiga murojaat qiling");
+
+      applyCurrentUser(user);
+      writeSession(user.id, remember);
+      user.lastLoginAt = formatDateNow();
+      addLoginLog(user, 'Kirdi');
+      saveAppState();
+      hideAuthScreen();
+      renderAll();
+      showToast(`Xush kelibsiz, ${user.name}!`, 'success');
+    }
+
+    async function handleRecoverSubmit(e) {
+      e.preventDefault();
+      const login = normalizeLogin(document.getElementById('auth-login')?.value);
+      const code = (document.getElementById('auth-code')?.value || '').trim();
+      const pass = document.getElementById('auth-pass')?.value || '';
+      const user = getUsers().find(u => u.login === login && u.role === 'owner');
+      if (!user || !user.recoveryHash) return authError("Egasi logini topilmadi");
+      if ((await hashPassword(code, user.recoverySalt)) !== user.recoveryHash) return authError("Tiklash kodi noto'g'ri");
+      if (pass.length < 4) return authError("Yangi parol kamida 4 ta belgi bo'lsin");
+      user.salt = makeSalt();
+      user.passHash = await hashPassword(pass, user.salt);
+      addLoginLog(user, 'Parol tiklandi');
+      saveAppState();
+      showAuthScreen('login', "✅ Parol yangilandi. Yangi parol bilan kiring.");
+    }
+
+    function logoutCurrentUser() {
+      if (currentUser) addLoginLog(currentUser, 'Chiqdi');
+      saveAppState();
+      writeSession('', false);
+      currentUser = null;
+      closeAppModal();
+      showAuthScreen('login');
+    }
+
+    function openAccountMenu() {
+      if (!currentUser) { showAuthScreen('login'); return; }
+      const pending = getUsers().filter(u => u.status === 'pending').length;
+      openAppModal("👤 Hisob", `
+        <div class="space-y-3">
+          <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-sm font-black text-slate-900 truncate">${escapeHtml(currentUser.name)}</div>
+              <div class="text-[11px] text-slate-500">${escapeHtml(currentUser.loginDisplay || currentUser.login)} • ${currentUser.role === 'owner' ? 'Egasi' : 'Sotuvchi'}</div>
+            </div>
+            <span class="px-2 py-1 rounded-lg text-[10px] font-extrabold ${currentUser.role === 'owner' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${currentUser.role === 'owner' ? 'EGASI' : 'SOTUVCHI'}</span>
+          </div>
+          ${currentUser.role === 'owner' ? `
+            <button type="button" onclick="closeAppModal(); setActiveTab('profil'); setTimeout(() => document.getElementById('staff-section')?.scrollIntoView({behavior:'smooth'}), 120);" class="w-full py-2.5 rounded-xl bg-violet-50 border border-violet-200 text-[#5b3df5] text-xs font-extrabold">
+              👥 Xodimlar va kirish tarixi ${pending ? `<span class="ml-1 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px]">${pending}</span>` : ''}
+            </button>
+          ` : ''}
+          <button type="button" onclick="openChangePasswordModal()" class="w-full py-2.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-extrabold">🔑 Parolni o'zgartirish</button>
+          <button type="button" onclick="logoutCurrentUser()" class="w-full py-2.5 rounded-xl bg-red-50 text-red-600 text-xs font-extrabold">🚪 Chiqish / Boshqa hisobga kirish</button>
+        </div>
+      `);
+    }
+
+    function openChangePasswordModal() {
+      openAppModal("🔑 Parolni o'zgartirish", `
+        <form onsubmit="handleChangePasswordSubmit(event)" class="space-y-3">
+          <input id="cp-old" type="password" required placeholder="Joriy parol" class="${AUTH_INPUT}" />
+          <input id="cp-new" type="password" required minlength="4" placeholder="Yangi parol" class="${AUTH_INPUT}" />
+          <input id="cp-new2" type="password" required minlength="4" placeholder="Yangi parolni takrorlang" class="${AUTH_INPUT}" />
+          <button type="submit" class="w-full py-3 rounded-2xl bg-[#5b3df5] text-white text-sm font-black">Saqlash</button>
+        </form>
+      `);
+    }
+
+    async function handleChangePasswordSubmit(e) {
+      e.preventDefault();
+      const oldP = document.getElementById('cp-old').value;
+      const newP = document.getElementById('cp-new').value;
+      const newP2 = document.getElementById('cp-new2').value;
+      if ((await hashPassword(oldP, currentUser.salt)) !== currentUser.passHash) return showToast("Joriy parol noto'g'ri", 'error');
+      if (newP.length < 4) return showToast("Yangi parol kamida 4 ta belgi bo'lsin", 'error');
+      if (newP !== newP2) return showToast("Yangi parollar bir xil emas", 'error');
+      currentUser.salt = makeSalt();
+      currentUser.passHash = await hashPassword(newP, currentUser.salt);
+      addLoginLog(currentUser, "Parolni o'zgartirdi");
+      saveAppState();
+      closeAppModal();
+      showToast("Parol yangilandi", 'success');
+    }
+
+    // ---- Egasi uchun: xodimlarni boshqarish ----
+    function renderStaffSectionHtml() {
+      if (!currentUser || currentUser.role !== 'owner') return '';
+      const users = getUsers();
+      const log = Array.isArray(appState.loginLog) ? appState.loginLog.slice(0, 30) : [];
+      const statusBadge = (u) => u.status === 'pending'
+        ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-extrabold">Tasdiq kutmoqda</span>'
+        : u.status === 'blocked'
+          ? '<span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-extrabold">Bloklangan</span>'
+          : '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-extrabold">Faol</span>';
+
+      return `
+        <div id="staff-section" class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-slate-800">👥 Xodimlar (${users.length})</span>
+          </div>
+          <div class="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl">
+            ${users.map(u => `
+              <div class="p-3 space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="text-xs font-black text-slate-900 truncate">${escapeHtml(u.name)} ${u.id === currentUser.id ? '<span class="text-[10px] text-slate-400">(siz)</span>' : ''}</div>
+                    <div class="text-[11px] text-slate-500 truncate">${escapeHtml(u.loginDisplay || u.login)} • ${u.role === 'owner' ? 'Egasi' : 'Sotuvchi'}${u.lastLoginAt ? ' • oxirgi kirish: ' + escapeHtml(u.lastLoginAt) : ''}</div>
+                  </div>
+                  ${statusBadge(u)}
+                </div>
+                ${u.id !== currentUser.id ? `
+                  <div class="flex flex-wrap gap-1.5">
+                    ${u.status === 'pending' ? `<button type="button" data-uid="${u.id}" onclick="setUserStatus(this.dataset.uid, 'active')" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-extrabold">✓ Tasdiqlash</button>` : ''}
+                    ${u.status === 'active' ? `<button type="button" data-uid="${u.id}" onclick="setUserStatus(this.dataset.uid, 'blocked')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-extrabold">Bloklash</button>` : ''}
+                    ${u.status === 'blocked' ? `<button type="button" data-uid="${u.id}" onclick="setUserStatus(this.dataset.uid, 'active')" class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-extrabold">Blokdan chiqarish</button>` : ''}
+                    <button type="button" data-uid="${u.id}" onclick="openResetUserPasswordModal(this.dataset.uid)" class="px-2.5 py-1 rounded-lg bg-violet-50 text-[#5b3df5] text-[11px] font-extrabold">Parolni yangilash</button>
+                    <button type="button" data-uid="${u.id}" onclick="confirmDeleteUser(this.dataset.uid)" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-extrabold">O'chirish</button>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="pt-1">
+            <div class="text-xs font-black text-slate-800 mb-1.5">🕓 Kirish tarixi</div>
+            ${log.length === 0 ? '<div class="text-[11px] text-slate-400">Hozircha yozuv yo\'q</div>' : `
+              <div class="max-h-56 overflow-y-auto divide-y divide-slate-100 border border-slate-200/80 rounded-2xl">
+                ${log.map(l => `
+                  <div class="px-3 py-2 flex items-center justify-between gap-2 text-[11px]">
+                    <span class="font-bold text-slate-800 truncate">${escapeHtml(l.name)} — ${escapeHtml(l.action)}</span>
+                    <span class="text-slate-400 shrink-0">${escapeHtml(l.date)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function setUserStatus(userId, status) {
+      if (!currentUser || currentUser.role !== 'owner') return;
+      const u = getUsers().find(x => x.id === userId);
+      if (!u) return;
+      u.status = status;
+      addLoginLog(u, status === 'active' ? 'Egasi tasdiqladi' : 'Egasi blokladi');
+      saveAppState();
+      renderActiveTab();
+      showToast(status === 'active' ? `${u.name} tasdiqlandi` : `${u.name} bloklandi`, 'success');
+    }
+
+    function confirmDeleteUser(userId) {
+      const u = getUsers().find(x => x.id === userId);
+      if (!u) return;
+      openConfirmModal("Xodimni o'chirish", `"${u.name}" hisobini o'chirasizmi? Uning savdolari tarixda qoladi.`, "O'chirish", () => {
+        appState.users = getUsers().filter(x => x.id !== userId);
+        addLoginLog(u, "Hisobi o'chirildi");
+        saveAppState();
+        renderActiveTab();
+      }, true);
+    }
+
+    function openResetUserPasswordModal(userId) {
+      const u = getUsers().find(x => x.id === userId);
+      if (!u) return;
+      openAppModal(`🔑 ${u.name} uchun yangi parol`, `
+        <form onsubmit="handleResetUserPassword(event, this.dataset.uid)" data-uid="${u.id}" class="space-y-3">
+          <input id="rp-new" type="text" required minlength="4" placeholder="Yangi parol (kamida 4 belgi)" class="${AUTH_INPUT}" />
+          <p class="text-[11px] text-slate-500">Yangi parolni xodimga ayting. U keyin Hisob → Parolni o'zgartirish orqali o'zgartirishi mumkin.</p>
+          <button type="submit" class="w-full py-3 rounded-2xl bg-[#5b3df5] text-white text-sm font-black">Saqlash</button>
+        </form>
+      `);
+    }
+
+    async function handleResetUserPassword(e, userId) {
+      e.preventDefault();
+      const u = getUsers().find(x => x.id === userId);
+      const p = document.getElementById('rp-new').value;
+      if (!u || p.length < 4) return showToast("Parol kamida 4 ta belgi bo'lsin", 'error');
+      u.salt = makeSalt();
+      u.passHash = await hashPassword(p, u.salt);
+      addLoginLog(u, 'Egasi parolni yangiladi');
+      saveAppState();
+      closeAppModal();
+      renderActiveTab();
+      showToast("Parol yangilandi", 'success');
     }
 
     // =========================================================================
@@ -5208,6 +6041,14 @@
     // =========================================================================
     saveAppState();
     renderAll();
+    initAuthGate();
+    imgLoadAll().then(() => {
+      renderAll();
+      const auth = document.getElementById('auth-screen');
+      if (auth && auth.style.display !== 'none') {
+        showAuthScreen(getUsers().some(u => u.role === 'owner') ? 'login' : 'register');
+      }
+    });
     if (getPrintEnv().native) {
       lastNativeRefreshAt = Date.now();
       refreshPairedBluetoothDevices(false);
