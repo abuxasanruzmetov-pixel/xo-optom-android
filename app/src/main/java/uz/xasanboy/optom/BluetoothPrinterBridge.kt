@@ -118,6 +118,10 @@ class BluetoothPrinterBridge(private val activity: MainActivity) {
     fun saveTextFile(fileName: String, content: String): Boolean =
         activity.saveTextToDownloads(fileName, content)
 
+    /** Telefon, xarita (geo:) va veb havolalarni tashqi ilovada ochish */
+    @JavascriptInterface
+    fun openUrl(url: String): Boolean = activity.openExternal(url)
+
     @Synchronized
     private fun send(bytes: ByteArray, address: String?, name: String?) {
         if (!hasConnectPermission()) {

@@ -137,6 +137,10 @@
       </div>
 
       <div class="flex items-center gap-1.5 shrink-0">
+        <button type="button" onclick="setActiveTab('buyurtmalar'); loadOnlineOrders(true);" title="Onlayn buyurtmalar" class="relative w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
+          🛍️
+          <span data-online-badge class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">0</span>
+        </button>
         <button type="button" onclick="openPrinterModal()" title="Printer sozlamalari" class="w-9 h-9 rounded-xl bg-violet-50 hover:bg-violet-100 text-[#5b3df5] flex items-center justify-center text-sm font-bold">
           🖨️
         </button>
@@ -218,6 +222,7 @@
         receiptCounter: 0,
         users: [],
         loginLog: [],
+        online: { url: '', key: '', autoSync: true, lastSyncAt: '', lastSyncSig: '', lastSeenOrderId: 0, bot: '' },
         store: {
           name: 'XASANBOY_OPTOM',
           phone: '',
@@ -274,7 +279,7 @@
 
         return {
           ...fallback,
-          activeTab: DEFAULT_NAV_ORDER.includes(parsed.activeTab) ? parsed.activeTab : 'asosiy',
+          activeTab: DEFAULT_NAV_ORDER.includes(parsed.activeTab) || parsed.activeTab === 'buyurtmalar' ? parsed.activeTab : 'asosiy',
           navOrder: sanitizeNavOrder(parsed.navOrder),
           role: parsed.role === 'salesperson' ? 'salesperson' : 'owner',
           pinCode: /^\d{4}$/.test(String(parsed.pinCode || '')) ? String(parsed.pinCode) : '1234',
@@ -287,6 +292,7 @@
           },
           users: Array.isArray(parsed.users) ? parsed.users : [],
           loginLog: Array.isArray(parsed.loginLog) ? parsed.loginLog : [],
+          online: { ...fallback.online, ...(parsed.online || {}) },
           products: Array.isArray(parsed.products) ? parsed.products : [],
           clients: Array.isArray(parsed.clients) ? parsed.clients : [],
           suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [],
@@ -390,8 +396,9 @@
       return false;
     }
 
+    const EXTRA_TABS = ['buyurtmalar'];
     function setActiveTab(tabId) {
-      if (!DEFAULT_NAV_ORDER.includes(tabId)) return;
+      if (!DEFAULT_NAV_ORDER.includes(tabId) && !EXTRA_TABS.includes(tabId)) return;
       const changed = appState.activeTab !== tabId;
       appState.activeTab = tabId;
       saveAppState();
@@ -861,6 +868,7 @@
       syncSwapBanner();
       renderBottomNav();
       renderActiveTab();
+      if (typeof updateOnlineBadge === 'function') updateOnlineBadge();
     }
 
     function renderActiveTab() {
@@ -894,6 +902,9 @@
           break;
         case 'profil':
           main.innerHTML = renderProfilTab();
+          break;
+        case 'buyurtmalar':
+          main.innerHTML = renderBuyurtmalarTab();
           break;
         default:
           main.innerHTML = renderAsosiyTab();
@@ -930,6 +941,16 @@
             <div class="text-[10px] text-slate-500 font-semibold mt-1">Sotuv: ${formatMoney(st.stockSaleValue)}</div>
           </div>
         </div>
+
+        ${onlineReady() ? `
+          <button type="button" onclick="setActiveTab('buyurtmalar'); loadOnlineOrders(true);" class="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-2xl p-3.5 shadow-sm flex items-center justify-between">
+            <div class="text-left">
+              <div class="text-[11px] font-bold text-emerald-100">Telegram onlayn do'kon</div>
+              <div class="text-sm font-black">🛍️ Yangi buyurtmalar: ${Number(onlineState.counts.new) || 0}</div>
+            </div>
+            <span class="text-xs font-extrabold">Ochish →</span>
+          </button>
+        ` : ''}
 
         <div class="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-sm">
           <div class="flex items-center justify-between mb-2.5">
@@ -1159,6 +1180,11 @@
             <input id="prod-favorite" type="checkbox" ${existing?.favorite ? 'checked' : ''} class="w-4 h-4 accent-amber-500" />
           </label>
 
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs font-bold text-slate-800">
+            <span>🌐 Onlayn katalogda (Telegram) ko'rsatish</span>
+            <input id="prod-online" type="checkbox" ${existing?.online === false ? '' : 'checked'} class="w-4 h-4 accent-emerald-600" />
+          </label>
+
           <!-- Ta'minotchi qidirish / yaratish va qisman to'lov kalkulyatori -->
           <div class="p-3 rounded-2xl bg-violet-50/70 border border-violet-200/80 space-y-2.5">
             <div class="flex items-center justify-between gap-2">
@@ -1376,6 +1402,8 @@
       const cost = Math.max(0, Number(document.getElementById('prod-cost').value) || 0);
       const price = Math.max(0, Number(document.getElementById('prod-price').value) || 0);
       const favorite = Boolean(document.getElementById('prod-favorite')?.checked);
+      const onlineEl = document.getElementById('prod-online');
+      const online = onlineEl ? onlineEl.checked : true;
 
       if (!name) {
         showToast("Mahsulot nomini kiriting", 'error');
@@ -1401,6 +1429,7 @@
           prod.cost = cost;
           prod.price = price;
           prod.favorite = favorite;
+          prod.online = online;
           prod.supplierId = supObj ? supObj.id : '';
           prod.supplierName = supObj ? supObj.name : '';
         }
@@ -1423,6 +1452,7 @@
         cost,
         price,
         favorite,
+        online,
         supplierId: supObj ? supObj.id : '',
         supplierName: supObj ? supObj.name : ''
       });
@@ -1620,6 +1650,7 @@
         if (el) values[id] = el.value;
       });
       values.__favorite = Boolean(document.getElementById('prod-favorite')?.checked);
+      values.__online = document.getElementById('prod-online') ? document.getElementById('prod-online').checked : true;
       productFormStash = { editId: editId || null, values };
       openScannerModal('add_product');
     }
@@ -1638,6 +1669,8 @@
       });
       const fav = document.getElementById('prod-favorite');
       if (fav) fav.checked = stash.values.__favorite;
+      const onl = document.getElementById('prod-online');
+      if (onl && stash.values.__online !== undefined) onl.checked = stash.values.__online;
       if (code) {
         const bc = document.getElementById('prod-barcode');
         if (bc) bc.value = code;
@@ -2343,7 +2376,10 @@
         items: draft.items.map(it => ({ ...it }))
       };
 
+      const onlineOrderId = draft.onlineOrderId || null;
+      if (onlineOrderId) saleRecord.onlineOrderId = onlineOrderId;
       appState.sales.push(saleRecord);
+      appState.saleDraft.onlineOrderId = null;
       appState.saleDraft.items = [];
       appState.saleDraft.discountAmount = 0;
       appState.saleDraft.paymentType = payType;
@@ -2351,6 +2387,7 @@
       closeAppModal();
       renderActiveTab();
       openReceiptModal(saleRecord.id);
+      if (onlineOrderId) onSaleCompletedForOnlineOrder(onlineOrderId, saleRecord.id);
 
       if (appState.printer.autoPrintReceipt) {
         autoPrintSale(saleRecord.id);
@@ -5144,6 +5181,13 @@
             <span>🖨️ Printer sozlamalari va Bluetooth</span>
             <span>Ochish →</span>
           </button>
+
+          ${isSalespersonMode() ? '' : `
+            <button type="button" onclick="openOnlineSettingsModal()" class="w-full py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-extrabold flex items-center justify-between">
+              <span>🌐 Onlayn do'kon (Telegram bot)</span>
+              <span>${onlineReady() ? 'Ulangan ✓' : 'Ulash →'}</span>
+            </button>
+          `}
         </div>
 
         ${isSalespersonMode() ? '' : renderLogoSettingsHtml()}
@@ -6031,11 +6075,569 @@
     }
 
     // =========================================================================
+    // 15d. ONLAYN DO'KON (Telegram Mini App): katalogni serverga yuborish va buyurtmalar
+    // =========================================================================
+    const ONLINE_STATUS = {
+      new: { label: 'Yangi', cls: 'bg-indigo-50 text-indigo-700', icon: '🆕' },
+      accepted: { label: 'Qabul qilingan', cls: 'bg-emerald-50 text-emerald-700', icon: '✅' },
+      delivering: { label: "Yo'lda", cls: 'bg-amber-50 text-amber-700', icon: '🚚' },
+      done: { label: 'Yetkazilgan', cls: 'bg-slate-100 text-slate-700', icon: '📦' },
+      cancelled: { label: 'Bekor qilingan', cls: 'bg-red-50 text-red-700', icon: '❌' }
+    };
+
+    const onlineState = {
+      orders: [],
+      counts: {},
+      status: 'new',
+      loading: false,
+      error: '',
+      syncing: false,
+      lastPollAt: 0,
+      timer: null
+    };
+
+    function onlineCfg() {
+      if (!appState.online || typeof appState.online !== 'object') {
+        appState.online = { url: '', key: '', autoSync: true, lastSyncAt: '', lastSyncSig: '', lastSeenOrderId: 0, bot: '' };
+      }
+      return appState.online;
+    }
+
+    function onlineReady() {
+      const c = onlineCfg();
+      return Boolean(c.url && c.key);
+    }
+
+    function normalizeServerUrl(u) {
+      let s = String(u || '').trim().replace(/\/+$/, '');
+      if (s && !/^https?:\/\//i.test(s)) s = 'https://' + s;
+      return s;
+    }
+
+    async function onlineFetch(path, opts = {}) {
+      const c = onlineCfg();
+      if (!onlineReady()) throw new Error("Onlayn do'kon sozlanmagan");
+      const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+      const t = ctrl ? setTimeout(() => ctrl.abort(), opts.timeout || 25000) : null;
+      try {
+        const res = await fetch(c.url + path, {
+          method: opts.method || 'GET',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': c.key },
+          body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+          signal: ctrl ? ctrl.signal : undefined
+        });
+        let data = {};
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok) throw new Error(data.error || `Server xatosi (${res.status})`);
+        return data;
+      } catch (err) {
+        if (err && err.name === 'AbortError') throw new Error("Server javob bermadi (internetni tekshiring)");
+        if (err instanceof TypeError) throw new Error("Serverga ulanib bo'lmadi (internet yoki manzilni tekshiring)");
+        throw err;
+      } finally {
+        if (t) clearTimeout(t);
+      }
+    }
+
+    // ---- tez xesh (rasm o'zgarganini aniqlash uchun) ----
+    const imgHashMemo = new Map();
+    function fnvHash(str) {
+      let h1 = 0x811c9dc5, h2 = 0x1b873593;
+      for (let i = 0; i < str.length; i++) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 16777619);
+        h2 = Math.imul(h2 ^ ch, 2246822507);
+      }
+      return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+    }
+    function imgHashFor(key) {
+      const data = imgCache.get(key);
+      if (!data) return '';
+      const memo = imgHashMemo.get(key);
+      if (memo && memo.len === data.length && memo.head === data.slice(64, 96)) return memo.hash;
+      const hash = fnvHash(data);
+      imgHashMemo.set(key, { len: data.length, head: data.slice(64, 96), hash });
+      return hash;
+    }
+
+    function buildCatalogPayload() {
+      const products = appState.products
+        .filter(p => p.online !== false && String(p.name || '').trim())
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          category: p.category || '',
+          unit: p.unit || 'Dona',
+          price: Number(p.price) || 0,
+          stock: Math.max(0, Number(p.qty) || 0),
+          active: true,
+          img_hash: imgHashFor('p_' + p.id)
+        }));
+      return {
+        products,
+        shop: {
+          name: appState.store.name || 'XASANBOY OPTOM',
+          phone: appState.store.phone || '',
+          logo_hash: imgHashFor(LOGO_KEY)
+        }
+      };
+    }
+
+    async function syncCatalogNow(manual = false) {
+      if (!onlineReady()) {
+        if (manual) showToast("Avval onlayn do'konni sozlang", 'error');
+        return false;
+      }
+      if (onlineState.syncing) return false;
+      onlineState.syncing = true;
+      const payload = buildCatalogPayload();
+      const sig = fnvHash(JSON.stringify(payload));
+      try {
+        const res = await onlineFetch('/api/admin/sync', { method: 'POST', body: payload, timeout: 60000 });
+        let uploaded = 0;
+        for (const pid of res.need_images || []) {
+          const data = imgCache.get('p_' + pid);
+          if (!data) continue;
+          await onlineFetch('/api/admin/image/' + encodeURIComponent(pid), { method: 'PUT', body: { hash: imgHashFor('p_' + pid), data }, timeout: 60000 });
+          uploaded++;
+        }
+        if (res.need_logo && imgCache.get(LOGO_KEY)) {
+          await onlineFetch('/api/admin/logo', { method: 'PUT', body: { hash: imgHashFor(LOGO_KEY), data: imgCache.get(LOGO_KEY) }, timeout: 60000 });
+        }
+        const c = onlineCfg();
+        c.lastSyncAt = formatDateNow();
+        c.lastSyncSig = sig;
+        c.lastSyncError = '';
+        saveAppState();
+        if (manual) showToast(`Katalog yuborildi: ${res.count} ta mahsulot${uploaded ? `, ${uploaded} ta rasm` : ''}`, 'success');
+        updateOnlineSettingsStatus();
+        return true;
+      } catch (err) {
+        onlineCfg().lastSyncError = err.message;
+        if (manual) showToast(err.message, 'error');
+        updateOnlineSettingsStatus();
+        return false;
+      } finally {
+        onlineState.syncing = false;
+      }
+    }
+
+    function catalogChanged() {
+      const sig = fnvHash(JSON.stringify(buildCatalogPayload()));
+      return sig !== onlineCfg().lastSyncSig;
+    }
+
+    // ---- buyurtmalar ----
+    let onlineLoadSeq = 0;
+    async function loadOnlineOrders(silent = true) {
+      if (!onlineReady()) return;
+      const seq = ++onlineLoadSeq;
+      const status = onlineState.status;
+      onlineState.loading = true;
+      if (!silent && appState.activeTab === 'buyurtmalar') renderActiveTab();
+      try {
+        const res = await onlineFetch('/api/admin/orders?status=' + encodeURIComponent(status) + '&limit=100');
+        onlineState.counts = res.counts || {};
+        if (seq !== onlineLoadSeq || status !== onlineState.status) return; // eskirgan javob
+        onlineState.orders = res.orders || [];
+        onlineState.error = '';
+      } catch (err) {
+        onlineState.error = err.message;
+      } finally {
+        onlineState.loading = false;
+        onlineState.lastPollAt = Date.now();
+        updateOnlineBadge();
+        if (appState.activeTab === 'buyurtmalar' && !document.getElementById('app-modal-backdrop')?.classList.contains('flex')) renderActiveTab();
+      }
+    }
+
+    async function pollNewOrders() {
+      if (!onlineReady() || !currentUser) return;
+      try {
+        const res = await onlineFetch('/api/admin/orders?status=new&limit=50', { timeout: 15000 });
+        onlineState.counts = res.counts || onlineState.counts;
+        const c = onlineCfg();
+        const maxId = (res.orders || []).reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
+        if (maxId > (Number(c.lastSeenOrderId) || 0)) {
+          const fresh = (res.orders || []).filter(o => o.id > (Number(c.lastSeenOrderId) || 0));
+          if (c.lastSeenOrderId) {
+            const first = fresh[0];
+            showToast(fresh.length > 1 ? `🛍️ ${fresh.length} ta yangi buyurtma!` : `🛍️ Yangi buyurtma #${first.id}: ${first.name}`, 'success');
+            try { navigator.vibrate && navigator.vibrate([120, 80, 120]); } catch (_) {}
+          }
+          c.lastSeenOrderId = maxId;
+          saveAppState();
+        }
+        if (onlineState.status === 'new' && !onlineState.loading) onlineState.orders = res.orders || [];
+        updateOnlineBadge();
+        if (appState.activeTab === 'buyurtmalar' && !document.getElementById('app-modal-backdrop')?.classList.contains('flex')) renderActiveTab();
+      } catch (_) {}
+    }
+
+    function updateOnlineBadge() {
+      const n = Number(onlineState.counts.new) || 0;
+      document.querySelectorAll('[data-online-badge]').forEach(el => {
+        el.textContent = n > 99 ? '99+' : String(n);
+        el.classList.toggle('hidden', n === 0);
+      });
+    }
+
+    function startOnlineLoops() {
+      if (onlineState.timer) clearInterval(onlineState.timer);
+      let tick = 0;
+      const run = async () => {
+        if (!onlineReady() || document.visibilityState === 'hidden') return;
+        tick++;
+        await pollNewOrders();
+        if (onlineCfg().autoSync !== false && tick % 2 === 1 && catalogChanged()) await syncCatalogNow(false);
+      };
+      onlineState.timer = setInterval(run, 30000);
+      setTimeout(run, 2500);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run(); });
+    }
+
+    function orderTime(ts) {
+      const d = new Date((Number(ts) || 0) * 1000);
+      const pad = v => String(v).padStart(2, '0');
+      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function renderBuyurtmalarTab() {
+      if (!onlineReady()) {
+        return `
+          <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm text-center space-y-3">
+            <div class="text-4xl">🛍️</div>
+            <div class="text-sm font-black text-slate-900">Onlayn buyurtmalar</div>
+            <p class="text-xs text-slate-500 leading-relaxed">Mijozlar Telegram bot orqali katalogingizni ko'rib, buyurtma beradi. Buyurtmalar shu yerga keladi.</p>
+            ${isSalespersonMode() ? '<p class="text-xs text-amber-700 font-bold">Sozlash uchun Egasi hisobi bilan kiring.</p>' : `<button type="button" onclick="openOnlineSettingsModal()" class="px-4 py-2.5 rounded-xl bg-[#5b3df5] text-white text-xs font-extrabold">🌐 Onlayn do'konni ulash</button>`}
+          </div>
+        `;
+      }
+      const chips = ['new', 'accepted', 'delivering', 'done', 'cancelled', 'all'];
+      const list = onlineState.orders;
+      return `
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-black text-slate-900">🛍️ Onlayn buyurtmalar</h2>
+            <p class="text-[11px] text-slate-500">${onlineState.lastPollAt ? 'Yangilandi: ' + new Date(onlineState.lastPollAt).toLocaleTimeString().slice(0, 5) : 'Yuklanmoqda...'}</p>
+          </div>
+          <div class="flex gap-1.5">
+            <button type="button" onclick="loadOnlineOrders(false)" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-[#5b3df5] font-black ${onlineState.loading ? 'animate-spin' : ''}">↻</button>
+            ${isSalespersonMode() ? '' : `<button type="button" onclick="openOnlineSettingsModal()" class="w-9 h-9 rounded-xl bg-white border border-slate-200">⚙️</button>`}
+          </div>
+        </div>
+
+        <div class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+          ${chips.map(s => {
+            const meta = ONLINE_STATUS[s];
+            const n = s === 'all' ? Object.values(onlineState.counts).reduce((a, b) => a + b, 0) : (onlineState.counts[s] || 0);
+            const on = onlineState.status === s;
+            return `<button type="button" onclick="onlineState.status='${s}'; onlineState.orders=[]; loadOnlineOrders(false);" class="shrink-0 px-3 py-2 rounded-xl text-xs font-extrabold ${on ? 'bg-[#5b3df5] text-white' : 'bg-white border border-slate-200 text-slate-600'}">${meta ? meta.label : 'Hammasi'}${n ? ` <span class="ml-0.5 ${on ? 'text-violet-200' : 'text-slate-400'}">${n}</span>` : ''}</button>`;
+          }).join('')}
+        </div>
+
+        ${onlineState.error ? `<div class="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold">${escapeHtml(onlineState.error)}</div>` : ''}
+
+        ${list.length === 0 ? `
+          <div class="bg-white rounded-2xl p-8 border border-slate-200/80 text-center">
+            <div class="text-3xl mb-2">📭</div>
+            <div class="text-xs font-bold text-slate-500">${onlineState.loading ? 'Yuklanmoqda...' : 'Bu bo\'limda buyurtmalar yo\'q'}</div>
+          </div>
+        ` : `
+          <div class="space-y-2">
+            ${list.map(o => {
+              const meta = ONLINE_STATUS[o.status] || ONLINE_STATUS.new;
+              return `
+                <button type="button" onclick="openOnlineOrderModal(${Number(o.id)})" class="w-full text-left bg-white rounded-2xl p-3.5 border ${o.status === 'new' ? 'border-indigo-200 shadow-sm' : 'border-slate-200/80'} space-y-1.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-black text-slate-900">#${o.id} • ${escapeHtml(o.name || 'Mijoz')}</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold ${meta.cls}">${meta.icon} ${meta.label}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                    <span>📞 ${escapeHtml(o.phone || '')} ${o.lat != null ? '• 📍' : ''}</span>
+                    <span>${orderTime(o.created_at)}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-[11px] text-slate-600 truncate">${o.items.length} xil: ${escapeHtml(o.items.map(i => i.name).join(', '))}</span>
+                    <span class="text-sm font-black text-[#5b3df5] shrink-0">${formatMoney(o.total)}</span>
+                  </div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        `}
+      `;
+    }
+
+    function findOnlineOrder(id) {
+      return onlineState.orders.find(o => Number(o.id) === Number(id)) || null;
+    }
+
+    function openExternalUrl(url) {
+      if (window.AndroidPrinter && typeof window.AndroidPrinter.openUrl === 'function') {
+        try { if (window.AndroidPrinter.openUrl(url)) return; } catch (_) {}
+      }
+      const w = window.open(url, '_blank');
+      if (!w) window.location.href = url;
+    }
+
+    function openOrderMap(lat, lng, label) {
+      const native = window.AndroidPrinter && typeof window.AndroidPrinter.openUrl === 'function';
+      const url = native
+        ? `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(label || 'Mijoz')})`
+        : `https://maps.google.com/?q=${lat},${lng}`;
+      openExternalUrl(url);
+    }
+
+    function openOnlineOrderModal(orderId) {
+      const o = findOnlineOrder(orderId);
+      if (!o) return;
+      const meta = ONLINE_STATUS[o.status] || ONLINE_STATUS.new;
+      const linkedSale = o.pos_sale_id ? appState.sales.find(s => s.id === o.pos_sale_id) : null;
+      const rows = o.items.map(it => {
+        const prod = appState.products.find(p => p.id === it.product_id);
+        const stock = prod ? Number(prod.qty) || 0 : null;
+        const short = prod && stock < Number(it.qty);
+        return `
+          <div class="py-2 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xs font-extrabold text-slate-900">${escapeHtml(it.name)}</div>
+              <div class="text-[11px] text-slate-500">${it.qty} ${escapeHtml(it.unit || '')} × ${formatPlainNumber(it.price)}
+                ${!prod ? ' • <span class="text-red-600 font-bold">omborda yo\'q</span>' : short ? ` • <span class="text-amber-700 font-bold">qoldiq ${stock}</span>` : ''}</div>
+            </div>
+            <div class="text-xs font-black text-slate-900 shrink-0">${formatPlainNumber(it.qty * it.price)}</div>
+          </div>`;
+      }).join('');
+
+      const btn = (label, onclick, cls) => `<button type="button" onclick="${onclick}" class="py-2.5 rounded-xl text-xs font-extrabold ${cls}">${label}</button>`;
+      let actions = '';
+      if (o.status === 'new') {
+        actions = `
+          ${btn('✓ Qabul qilish → Savdo va chek', `acceptOnlineOrderToSale(${o.id})`, 'w-full bg-[#5b3df5] text-white py-3 text-sm')}
+          <div class="grid grid-cols-2 gap-2">
+            ${btn('Faqat qabul qilish', `setOnlineOrderStatus(${o.id}, 'accepted')`, 'bg-emerald-50 text-emerald-700')}
+            ${btn('✕ Bekor qilish', `confirmCancelOnlineOrder(${o.id})`, 'bg-red-50 text-red-600')}
+          </div>`;
+      } else if (o.status === 'accepted') {
+        actions = `
+          ${!linkedSale ? btn('🧾 Savdoga o\'tkazish va chek', `acceptOnlineOrderToSale(${o.id})`, 'w-full bg-[#5b3df5] text-white') : ''}
+          <div class="grid grid-cols-2 gap-2">
+            ${btn("🚚 Yo'lga chiqdi", `setOnlineOrderStatus(${o.id}, 'delivering')`, 'bg-amber-50 text-amber-800')}
+            ${btn('📦 Yetkazildi', `setOnlineOrderStatus(${o.id}, 'done')`, 'bg-emerald-50 text-emerald-700')}
+          </div>
+          ${btn('✕ Bekor qilish', `confirmCancelOnlineOrder(${o.id})`, 'w-full bg-red-50 text-red-600')}`;
+      } else if (o.status === 'delivering') {
+        actions = btn('📦 Yetkazildi', `setOnlineOrderStatus(${o.id}, 'done')`, 'w-full bg-emerald-600 text-white py-3 text-sm');
+      }
+
+      openAppModal(`Buyurtma #${o.id}`, `
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg text-[11px] font-extrabold ${meta.cls}">${meta.icon} ${meta.label}</span>
+            <span class="text-[11px] text-slate-500">${orderTime(o.created_at)}</span>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="text-sm font-black text-slate-900">${escapeHtml(o.name || 'Mijoz')}</div>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" onclick="openExternalUrl('tel:${escapeHtml(String(o.phone || '').replace(/[^+\d]/g, ''))}')" class="py-2 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-800">📞 ${escapeHtml(o.phone || '')}</button>
+              ${o.lat != null ? `<button type="button" onclick="openOrderMap(${Number(o.lat)}, ${Number(o.lng)}, '${escapeHtml(String(o.name || '').replace(/'/g, ''))}')" class="py-2 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-[#5b3df5]">🗺️ Xaritada ochish</button>` : '<span class="py-2 text-center text-[11px] text-slate-400">Joylashuv yo\'q</span>'}
+            </div>
+            ${o.address ? `<div class="text-xs text-slate-700">🏠 ${escapeHtml(o.address)}</div>` : ''}
+            ${o.comment ? `<div class="text-xs text-slate-700">💬 ${escapeHtml(o.comment)}</div>` : ''}
+          </div>
+
+          <div class="px-3 rounded-2xl border border-slate-200 divide-y divide-slate-100">${rows}</div>
+
+          <div class="p-3 rounded-2xl bg-violet-50 flex justify-between items-center">
+            <span class="text-sm font-black text-slate-900">Jami</span>
+            <span class="text-base font-black text-[#5b3df5]">${formatMoney(o.total)}</span>
+          </div>
+
+          ${linkedSale ? btn('🧾 Nakladnoyni ochish', `openReceiptModal('${linkedSale.id}')`, 'w-full bg-white border border-violet-200 text-[#5b3df5]') : ''}
+          <div class="space-y-2">${actions}</div>
+        </div>
+      `);
+    }
+
+    function confirmCancelOnlineOrder(orderId) {
+      openConfirmModal("Buyurtmani bekor qilish", `#${orderId} buyurtmani bekor qilasizmi? Mijozga xabar boradi.`, "Bekor qilish", () => setOnlineOrderStatus(orderId, 'cancelled'), true);
+    }
+
+    async function setOnlineOrderStatus(orderId, status, saleId = '', opts = {}) {
+      try {
+        const res = await onlineFetch(`/api/admin/orders/${orderId}/status`, { method: 'POST', body: { status, pos_sale_id: saleId } });
+        const idx = onlineState.orders.findIndex(o => Number(o.id) === Number(orderId));
+        if (idx !== -1 && res.order) onlineState.orders[idx] = res.order;
+        loadOnlineOrders(true);
+        if (!opts.keepModal) closeAppModal();
+        showToast(`#${orderId}: ${ONLINE_STATUS[status]?.label || status}. Mijozga xabar yuborildi`, 'success');
+        if (!opts.keepModal && appState.activeTab === 'buyurtmalar') renderActiveTab();
+        return true;
+      } catch (err) {
+        showToast(err.message, 'error');
+        return false;
+      }
+    }
+
+    function phoneKey(p) {
+      const d = String(p || '').replace(/\D/g, '');
+      return d.slice(-9);
+    }
+
+    function acceptOnlineOrderToSale(orderId) {
+      const o = findOnlineOrder(orderId);
+      if (!o) return;
+      if (appState.saleDraft.items.length > 0 && appState.saleDraft.onlineOrderId !== o.id) {
+        openConfirmModal("Savatcha bo'sh emas", "Savdo savatchasida boshqa tovarlar bor. Ularni olib tashlab, buyurtmani yuklaymizmi?", "Ha, yuklash", () => loadOnlineOrderIntoDraft(o));
+        return;
+      }
+      loadOnlineOrderIntoDraft(o);
+    }
+
+    function loadOnlineOrderIntoDraft(o) {
+      // Mijozni telefon raqami bo'yicha topamiz yoki yaratamiz
+      const key = phoneKey(o.phone);
+      let client = key ? appState.clients.find(c => phoneKey(c.phone) === key) : null;
+      if (!client) {
+        client = {
+          id: uid('cli'),
+          name: o.name || 'Telegram mijoz',
+          phone: o.phone || '',
+          note: o.address || (o.lat != null ? `📍 ${Number(o.lat).toFixed(5)}, ${Number(o.lng).toFixed(5)}` : 'Telegram buyurtma'),
+          debt: 0,
+          history: [],
+          tgId: o.tg_id || ''
+        };
+        appState.clients.unshift(client);
+      } else if (o.tg_id && !client.tgId) {
+        client.tgId = o.tg_id;
+      }
+
+      appState.saleDraft = {
+        clientId: client.id,
+        paymentType: 'Naqd',
+        paidAmount: 0,
+        discountAmount: 0,
+        onlineOrderId: o.id,
+        items: o.items.map(it => {
+          const prod = appState.products.find(p => p.id === it.product_id);
+          return {
+            productId: prod ? prod.id : '',
+            name: it.name,
+            unit: it.unit || prod?.unit || 'Dona',
+            barcode: prod?.barcode || '',
+            qty: Number(it.qty) || 0,
+            price: Number(it.price) || 0,
+            cost: Number(prod?.cost) || 0
+          };
+        }).filter(it => it.qty > 0)
+      };
+      saveAppState();
+      closeAppModal();
+      setActiveTab('savdo');
+      openPosCheckoutModal();
+      showToast(`#${o.id} buyurtma savdoga yuklandi. To'lov turini tanlang`, 'info');
+    }
+
+    // Savdo yakunlanganda chaqiriladi (handlePosCheckoutSubmit ichidan)
+    function onSaleCompletedForOnlineOrder(onlineOrderId, saleId) {
+      if (!onlineOrderId) return;
+      setOnlineOrderStatus(onlineOrderId, 'accepted', saleId, { keepModal: true }).then(ok => {
+        if (!ok) showToast(`Savdo saqlandi, lekin #${onlineOrderId} holatini serverga yuborib bo'lmadi`, 'error');
+      });
+    }
+
+    // ---- sozlamalar ----
+    function updateOnlineSettingsStatus() {
+      const box = document.getElementById('online-sync-status');
+      if (!box) return;
+      const c = onlineCfg();
+      box.innerHTML = c.lastSyncError
+        ? `<span class="text-red-600">⚠️ ${escapeHtml(c.lastSyncError)}</span>`
+        : c.lastSyncAt ? `<span class="text-emerald-700">✓ Oxirgi yuborish: ${escapeHtml(c.lastSyncAt)}</span>` : '<span class="text-slate-500">Katalog hali yuborilmagan</span>';
+    }
+
+    function openOnlineSettingsModal() {
+      if (!guardOwnerAction("Onlayn do'kon sozlamalari faqat Egasi uchun")) return;
+      const c = onlineCfg();
+      const visible = appState.products.filter(p => p.online !== false).length;
+      openAppModal("🌐 Onlayn do'kon (Telegram)", `
+        <div class="space-y-3">
+          <p class="text-[11px] text-slate-600 leading-relaxed">Ombordagi mahsulotlar (rasm va narxi bilan) Telegram botdagi katalogga chiqadi. Mijozlar buyurtmasi <b>🛍️ Buyurtmalar</b> bo'limiga keladi.</p>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Server manzili</label>
+            <input id="online-url" type="url" value="${escapeHtml(c.url || '')}" placeholder="https://xo-server.up.railway.app" autocapitalize="none" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Admin kaliti (ADMIN_KEY)</label>
+            <input id="online-key" type="password" value="${escapeHtml(c.key || '')}" autocapitalize="none" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono" />
+          </div>
+          <button type="button" onclick="saveOnlineSettings()" class="w-full py-2.5 rounded-xl bg-[#5b3df5] text-white text-xs font-extrabold">Saqlash va ulanishni tekshirish</button>
+          <div id="online-ping-box" class="hidden p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1"></div>
+
+          <div class="p-3 rounded-2xl bg-white border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-slate-900">Katalog</span>
+              <span class="text-[11px] text-slate-500">${visible} ta mahsulot ko'rinadi</span>
+            </div>
+            <div id="online-sync-status" class="text-[11px] font-bold"></div>
+            <label class="flex items-center justify-between text-xs font-bold text-slate-700">
+              <span>O'zgarishlarni avtomatik yuborish</span>
+              <input type="checkbox" ${c.autoSync !== false ? 'checked' : ''} onchange="onlineCfg().autoSync = this.checked; saveAppState();" class="w-4 h-4 accent-[#5b3df5]" />
+            </label>
+            <button type="button" onclick="syncCatalogNow(true)" class="w-full py-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-extrabold">⬆ Katalogni hozir yuborish</button>
+            <p class="text-[10.5px] text-slate-400">Biror tovarni katalogdan yashirish uchun: tovarni tahrirlang → "Onlayn katalogda ko'rsatish" belgisini o'chiring.</p>
+          </div>
+        </div>
+      `);
+      updateOnlineSettingsStatus();
+      if (onlineReady()) pingOnlineServer();
+    }
+
+    async function saveOnlineSettings() {
+      const c = onlineCfg();
+      c.url = normalizeServerUrl(document.getElementById('online-url')?.value);
+      c.key = (document.getElementById('online-key')?.value || '').trim();
+      c.lastSyncSig = '';
+      saveAppState();
+      const ok = await pingOnlineServer();
+      if (ok) {
+        await syncCatalogNow(true);
+        loadOnlineOrders(true);
+      }
+    }
+
+    async function pingOnlineServer() {
+      const box = document.getElementById('online-ping-box');
+      if (box) { box.classList.remove('hidden'); box.innerHTML = 'Tekshirilmoqda...'; }
+      try {
+        const r = await onlineFetch('/api/admin/ping', { timeout: 15000 });
+        onlineCfg().bot = r.bot || '';
+        saveAppState();
+        if (box) {
+          box.innerHTML = `
+            <div class="font-black text-emerald-700">✓ Server ulandi</div>
+            <div>🤖 Bot: ${r.bot ? '@' + escapeHtml(r.bot) : r.telegram ? '<span class="text-amber-700">token bor, bot nomi hali aniqlanmadi</span>' : '<span class="text-red-600">BOT_TOKEN sozlanmagan</span>'}</div>
+            <div>📦 Katalogda: ${r.products} ta • 👥 Mijozlar: ${r.customers} • 🆕 Yangi: ${r.new_orders}</div>
+            <div>${r.admin_chat ? '🔔 Telegram xabarnoma: ulangan' : `🔔 Xabarnoma uchun botga yozing: <b class="font-mono">/admin KALIT</b>`}</div>
+            ${r.bot ? `<button type="button" onclick="openExternalUrl('https://t.me/${escapeHtml(r.bot)}')" class="mt-1 w-full py-2 rounded-xl bg-white border border-slate-200 font-extrabold text-[#5b3df5]">Botni ochish</button>` : ''}
+          `;
+        }
+        return true;
+      } catch (err) {
+        if (box) box.innerHTML = `<span class="text-red-600 font-bold">⚠️ ${escapeHtml(err.message)}</span>`;
+        return false;
+      }
+    }
+
+    // =========================================================================
     // 16. DARHOL BIRINCHI KADRDA ISHGA TUSHIRISH
     // =========================================================================
     saveAppState();
     renderAll();
     initAuthGate();
+    startOnlineLoops();
     imgLoadAll().then(() => {
       renderAll();
       const auth = document.getElementById('auth-screen');

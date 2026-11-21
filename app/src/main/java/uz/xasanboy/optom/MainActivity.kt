@@ -14,6 +14,7 @@ import android.provider.MediaStore
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -44,7 +45,14 @@ class MainActivity : Activity() {
             cacheMode = WebSettings.LOAD_DEFAULT
         }
         webView.addJavascriptInterface(printer, "AndroidPrinter")
-        webView.webViewClient = WebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            // Ilova ichidagi sahifadan boshqa har qanday havola (tel:, geo:, https://) tashqi ilovada ochiladi
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val url = request?.url?.toString() ?: return false
+                if (url.startsWith("file:///android_asset/")) return false
+                return openExternal(url)
+            }
+        }
         webView.webChromeClient = object : WebChromeClient() {
             // Kamera (shtrix-kod skaneri)
             override fun onPermissionRequest(request: PermissionRequest) {
@@ -120,6 +128,26 @@ class MainActivity : Activity() {
             fileCallback?.onReceiveValue(if (uri != null) arrayOf(uri) else null)
             fileCallback = null
         }
+    }
+
+    fun openExternal(url: String): Boolean {
+        runOnUiThread {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (e: Exception) {
+                if (url.startsWith("geo:")) {
+                    val q = url.substringAfter("q=").substringBefore("(")
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://maps.google.com/?q=$q")))
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "Xarita ilovasi topilmadi", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(this, "Ochib bo'lmadi", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        return true
     }
 
     /** JSON zaxira faylini "Yuklanmalar" (Downloads) papkasiga saqlash */
