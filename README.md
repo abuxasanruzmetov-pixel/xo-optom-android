@@ -1,20 +1,21 @@
-# XASANBOY_OPTOM — Android ilova
+# XASANBOY OPTOM — onlayn do'kon serveri
 
-`app/src/main/assets/index.html` sahifasini ochadigan Android ilova. Ichida `window.AndroidPrinter` ko'prigi bor:
-telefonning Bluetooth sozlamalarida ulangan (paired) printerlar ro'yxatini ko'rsatadi va chekni
-Bluetooth Classic (SPP) orqali chop etadi. MHT-P8003, Xprinter va boshqa ESC/POS printerlar bilan ishlaydi.
+Bitta server uchta ishni bajaradi:
+1. **Telegram bot**: mijoz ro'yxatdan o'tadi (telefon raqam va joylashuv), buyurtma holati haqida xabar oladi.
+2. **Mijoz Mini App** (`webapp/index.html`): katalog, savatcha, buyurtma berish, "Buyurtmalarim".
+3. **POS uchun API**: XASANBOY_OPTOM ilovasi katalogni yuklaydi va buyurtmalarni oladi.
 
-## APK olish (GitHub orqali, kompyutersiz)
-1. GitHub'da yangi repo oching (masalan `xo-optom-android`) va shu papkadagi hamma faylni yuklang.
-2. **Actions** bo'limida "APK yig'ish" jarayoni o'zi ishga tushadi (taxminan 3–5 daqiqa).
-3. Jarayon tugagach, sahifaning pastidagi **Artifacts** bo'limidan `XASANBOY_OPTOM-apk` ni yuklab oling.
-4. Zip ichidagi `app-debug.apk` ni telefonga o'rnating ("Noma'lum manbalar"ga ruxsat bering).
+Faqat Python standart kutubxonasi ishlatiladi, tashqi paketlar kerak emas.
 
-## Birinchi ishga tushirish
-1. Printerni telefonning **Sozlamalar → Bluetooth** bo'limida ulang (PIN odatda `0000` yoki `1234`).
-2. Ilovani oching va "Yaqin atrofdagi qurilmalar" (Bluetooth) ruxsatini bering.
-3. 🖨️ → printer ro'yxatidan printerni tanlang → **🧪 Test chek**.
+## Railway sozlamalari
+| O'zgaruvchi | Qiymat |
+|---|---|
+| `BOT_TOKEN` | @BotFather bergan token |
+| `ADMIN_KEY` | O'zingiz o'ylab topgan maxfiy kalit (kamida 8 belgi). POS ilovaga ham shu kalit kiritiladi |
+| `DATA_DIR` | `/data` (Volume shu manzilga ulanadi) |
 
-## Sahifani yangilash
-`index.html` ni o'zgartirsangiz, uni `app/src/main/assets/index.html` ga almashtiring va GitHub'ga yuklang. Yangi APK o'zi yig'iladi.
-Eslatma: ma'lumotlar telefonda (ilova ichida) saqlanadi. Ilovani o'chirishdan oldin Profil → **Eksport (JSON)** qiling.
+**Volume**: `/data` manziliga ulang, aks holda qayta yuklanganda baza o'chib ketadi.
+**Domain**: Settings → Networking → Generate Domain.
+
+## Do'kon egasini ulash
+Botga `/admin ADMIN_KEY` deb yozing. Shundan keyin yangi buyurtmalar Telegram'ga ham keladi.

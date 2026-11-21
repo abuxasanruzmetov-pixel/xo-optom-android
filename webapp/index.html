@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>XASANBOY OPTOM</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --brand: #E61F24; --brand-soft: #FFF1F1; --blue: #2F7CF6; --blue-soft: #EEF4FF;
+    --ink: #0F172A; --muted: #64748B; --line: #E8EBF0; --bg: #F5F6F9; --card: #FFFFFF;
+    --green: #059669; --orange: #EA580C;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif; }
+  body { max-width: 560px; margin: 0 auto; min-height: 100vh; padding-bottom: 96px; }
+  button { font: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+  input, textarea { font: inherit; color: inherit; }
+  a { color: inherit; text-decoration: none; }
+  .hidden { display: none !important; }
+
+  /* Sarlavha */
+  .top { position: sticky; top: 0; z-index: 20; background: var(--card); box-shadow: 0 1px 0 var(--line); }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+  .round { width: 40px; height: 40px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 6px rgba(15,23,42,.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 17px; }
+  .bar h1 { flex: 1; font-size: 18px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lang { font-size: 12px; font-weight: 900; color: var(--blue); }
+  .search { margin: 0 14px 10px; display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: 14px; padding: 0 12px; }
+  .search input { flex: 1; border: none; background: none; padding: 11px 0; font-size: 14px; outline: none; }
+
+  /* Banner */
+  .banners { padding: 12px 14px 4px; }
+  .slides { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; scrollbar-width: none; border-radius: 18px; }
+  .slides::-webkit-scrollbar { display: none; }
+  .slide { flex: 0 0 100%; scroll-snap-align: center; aspect-ratio: 2 / 1; border-radius: 18px; overflow: hidden; background: #e2e8f0; }
+  .slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .dots { display: flex; justify-content: center; gap: 6px; padding: 8px 0 2px; }
+  .dot { width: 7px; height: 7px; border-radius: 4px; background: #C7D7FB; transition: all .2s; }
+  .dot.on { width: 22px; background: var(--blue); }
+
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; scrollbar-width: none; position: sticky; top: 60px; z-index: 15; background: var(--bg); }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex-shrink: 0; padding: 9px 16px; border-radius: 999px; background: var(--card); font-size: 13px; font-weight: 700; color: #334155; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+  .chip.on { background: var(--blue); color: #fff; }
+
+  .sec-title { font-size: 19px; font-weight: 800; padding: 14px 14px 4px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 8px 14px; }
+  @media (min-width: 480px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  .card { background: var(--card); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 4px rgba(15,23,42,.06); position: relative; }
+  .pic { aspect-ratio: 1 / 1; background: #F8FAFC; display: flex; align-items: center; justify-content: center; position: relative; }
+  .pic img { width: 100%; height: 100%; object-fit: contain; }
+  .pic .ph { font-size: 34px; font-weight: 900; color: #CBD5E1; }
+  .badge-disc { position: absolute; top: 10px; left: 10px; background: #EF4444; color: #fff; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 8px; }
+  .fav { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(15,23,42,.12); display: flex; align-items: center; justify-content: center; }
+  .fav svg { width: 19px; height: 19px; }
+  .out { position: absolute; inset: 0; background: rgba(255,255,255,.7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: var(--muted); }
+  .body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
+  .name { font-size: 13.5px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 35px; }
+  .price { font-size: 16px; font-weight: 800; }
+  .price.disc { color: var(--blue); }
+  .old { font-size: 12px; color: var(--muted); text-decoration: line-through; }
+  .stock { font-size: 11.5px; color: var(--muted); }
+  .stock.low { color: var(--orange); font-weight: 600; }
+  .add { margin-top: auto; padding: 10px 0; border-radius: 12px; background: var(--blue); color: #fff; font-weight: 700; font-size: 14px; }
+  .add:disabled { background: #CBD5E1; }
+  .step { margin-top: auto; display: flex; align-items: center; justify-content: space-between; background: var(--blue-soft); border-radius: 12px; color: var(--blue); }
+  .step button { width: 40px; height: 38px; font-size: 20px; font-weight: 800; color: var(--blue); }
+  .step span { font-weight: 800; font-size: 14px; }
+  .empty { text-align: center; padding: 60px 24px; color: var(--muted); font-size: 14px; }
+  .empty b { display: block; font-size: 44px; margin-bottom: 10px; }
+
+  /* Sahifalar */
+  .section { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .box { background: var(--card); border-radius: 18px; padding: 14px; box-shadow: 0 1px 4px rgba(15,23,42,.05); }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .between { justify-content: space-between; }
+  .citem { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .citem:last-child { border-bottom: none; }
+  .thumb { width: 56px; height: 56px; border-radius: 14px; background: #F8FAFC; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #CBD5E1; font-weight: 900; }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .info { flex: 1; min-width: 0; }
+  .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .s { font-size: 12.5px; color: var(--muted); }
+  .mini-step { display: flex; align-items: center; gap: 4px; }
+  .mini-step button { width: 32px; height: 32px; border-radius: 10px; background: var(--bg); font-weight: 800; font-size: 17px; }
+  .mini-step input { width: 48px; text-align: center; border: 1px solid var(--line); border-radius: 10px; padding: 6px 2px; font-weight: 700; font-size: 13px; }
+  .h2 { font-size: 15px; font-weight: 800; }
+  .label { font-size: 12px; font-weight: 700; color: var(--muted); margin: 10px 0 4px; }
+  .field { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; font-size: 14px; outline: none; background: #fff; }
+  .field:focus { border-color: var(--blue); }
+  .sumrow { display: flex; justify-content: space-between; font-size: 14px; color: var(--muted); padding: 3px 0; }
+  .total { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: 900; padding-top: 6px; }
+  .btn { width: 100%; padding: 15px; border-radius: 16px; background: var(--blue); color: #fff; font-weight: 800; font-size: 15px; }
+  .btn:disabled { background: #D1D5DB; color: #6B7280; }
+  .btn.soft { background: var(--blue-soft); color: var(--blue); }
+  .btn.ghost { background: var(--bg); color: var(--ink); }
+  .btn.red { background: #FEF2F2; color: #DC2626; }
+  .warn-box { background: #FEFCE8; border: 1px solid #FDE68A; color: #713F12; border-radius: 14px; padding: 11px 12px; font-size: 13px; font-weight: 600; }
+  .pill { font-size: 11.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+  .st-new { background: #EEF2FF; color: #4338CA; }
+  .st-accepted { background: #ECFDF5; color: var(--green); }
+  .st-delivering { background: #FFFBEB; color: #B45309; }
+  .st-done { background: #ECFDF5; color: var(--green); }
+  .st-cancelled { background: #FEF2F2; color: #B91C1C; }
+  .tabs2 { display: grid; grid-template-columns: 1fr 1fr; background: #E9EDF3; border-radius: 14px; padding: 4px; }
+  .tabs2 button { padding: 10px; border-radius: 11px; font-weight: 700; font-size: 14px; color: var(--muted); }
+  .tabs2 button.on { background: #fff; color: var(--blue); box-shadow: 0 1px 3px rgba(15,23,42,.08); }
+  .note { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .ok { color: var(--green); font-weight: 700; }
+  .warn { color: #B45309; font-weight: 700; }
+  .icon-tile { width: 44px; height: 44px; border-radius: 13px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .act { width: 46px; height: 46px; border-radius: 14px; background: #fff; box-shadow: 0 1px 6px rgba(15,23,42,.1); display: flex; align-items: center; justify-content: center; font-size: 19px; }
+
+  /* Pastki menyu */
+  .cartbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 86px; width: calc(100% - 28px); max-width: 532px; background: var(--ink); color: #fff; border-radius: 16px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 25; box-shadow: 0 10px 24px rgba(15,23,42,.25); }
+  .cartbar b { font-size: 15px; }
+  .cartbar span { font-size: 12px; opacity: .75; }
+  .nav { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 536px; background: var(--card); border-radius: 22px; box-shadow: 0 6px 24px rgba(15,23,42,.12); display: grid; grid-template-columns: repeat(4, 1fr); z-index: 30; padding: 6px; }
+  .tab { padding: 7px 0 6px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 600; color: #94A3B8; position: relative; }
+  .tab svg { width: 24px; height: 24px; }
+  .tab.on { color: var(--blue); background: var(--blue-soft); }
+  .badge { position: absolute; top: 0; left: calc(50% + 4px); min-width: 19px; height: 19px; border-radius: 10px; background: var(--blue); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #fff; }
+
+  /* Mahsulot oynasi */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; background: var(--card); border-radius: 24px 24px 0 0; padding-bottom: 18px; animation: up .2s ease; }
+  @keyframes up { from { transform: translateY(40px); opacity: .5; } to { transform: none; opacity: 1; } }
+  .gallery { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; background: #F8FAFC; }
+  .gallery::-webkit-scrollbar { display: none; }
+  .gallery div { flex: 0 0 100%; aspect-ratio: 1 / 1; scroll-snap-align: center; display: flex; align-items: center; justify-content: center; }
+  .gallery img { width: 100%; height: 100%; object-fit: contain; }
+  .sheet-close { position: absolute; top: 12px; right: 12px; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.92); font-size: 18px; font-weight: 800; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+
+  /* Ro'yxatdan o'tish */
+  .reg { padding: 26px 18px; display: flex; flex-direction: column; gap: 14px; }
+  .reg .hero { text-align: center; }
+  .logo-big { width: 76px; height: 76px; border-radius: 22px; margin: 0 auto 10px; background: var(--brand); color: #fff; font-weight: 900; font-size: 24px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .logo-big img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+  .reg h2 { font-size: 20px; font-weight: 900; }
+  .stepbox { background: var(--card); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .stepnum { width: 26px; height: 26px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stepnum.done { background: var(--green); }
+
+  .toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%) translateY(-20px); opacity: 0; background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 14px; font-size: 13px; font-weight: 700; z-index: 99; transition: all .2s; max-width: 92vw; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.err { background: #B91C1C; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; margin: 60px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="toast" class="toast"></div>
+<div id="app"><div class="spinner"></div></div>
+<div id="sheet-root"></div>
+
+<nav id="nav" class="nav hidden">
+  <button class="tab" data-tab="catalog" onclick="go('catalog')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+    <span data-i18n="nav_catalog"></span>
+  </button>
+  <button class="tab" data-tab="cart" onclick="go('cart')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 11.4a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 7H6"/></svg>
+    <span data-i18n="nav_cart"></span><span id="cart-badge" class="badge hidden">0</span>
+  </button>
+  <button class="tab" data-tab="favs" onclick="go('favs')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.4-9.2-8.6C1.2 8.2 3 4.5 6.6 4.5c2 0 3.4 1.1 4.4 2.5 1-1.4 2.4-2.5 4.4-2.5 3.6 0 5.4 3.7 3.8 6.9C19 15.6 12 20 12 20z"/></svg>
+    <span data-i18n="nav_favs"></span><span id="fav-badge" class="badge hidden">0</span>
+  </button>
+  <button class="tab" data-tab="orders" onclick="go('orders')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    <span data-i18n="nav_orders"></span>
+  </button>
+</nav>
+
+<script>
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const INIT = tg ? tg.initData : '';
+  const CART_KEY = 'xo_cart_v1';
+  const FAV_KEY = 'xo_favs_v1';
+  const LANG_KEY = 'xo_lang';
+
+  // ---------------- Tarjimalar ----------------
+  const I18N = {
+    uz: {
+      nav_catalog: 'Katalog', nav_cart: 'Savat', nav_favs: 'Sevimlilar', nav_orders: 'Buyurtmalar',
+      search: 'Mahsulot qidirish...', all: 'Hammasi', other: 'Boshqa', to_cart: 'Savatga', sold_out: 'Tugagan',
+      only_left: 'Faqat {n} {u}', in_stock: 'Mavjud: {n} {u}', catalog_empty: "Katalog hozircha bo'sh", nothing_found: 'Hech narsa topilmadi',
+      cart: 'Savat', cart_items: '{n} ta mahsulot', clear: 'Tozalash', cart_empty: "Savat bo'sh", go_catalog: "Katalogga o'tish",
+      promo: 'Promokod', apply: "Qo'llash", promo_ok: 'Promokod qo\'llandi', remove: "Olib tashlash",
+      min_order: 'Minimal buyurtma — {s}', add_more: "{s} ga qo'shing", subtotal: 'Mahsulotlar', discount: 'Chegirma', delivery: 'Yetkazib berish',
+      free: 'Bepul', free_from: '{s} dan ortiq buyurtmada yetkazib berish bepul', total: 'Jami', order: 'Buyurtma berish', sending: 'Yuborilmoqda...',
+      delivery_info: 'Yetkazib berish', loc_saved: '📍 Joylashuv saqlangan', loc_missing: '📍 Joylashuv yuborilmagan', update: 'Yangilash', send: 'Yuborish',
+      address: "Manzil / mo'ljal", optional: '(ixtiyoriy)', required: '(majburiy)', addr_ph: 'Masalan: bozor yonida, 2-do\'kon',
+      comment: 'Izoh', comment_ph: "Qo'shimcha istaklar...", need_loc: 'Joylashuv yoki manzilni kiriting',
+      order_ok: 'Buyurtma #{id} qabul qilindi!', order_ok_sub: "Tez orada siz bilan bog'lanamiz.", my_orders: "Buyurtmalarimni ko'rish", back_catalog: 'Katalogga qaytish',
+      favs: 'Sevimlilar', favs_empty: "Sevimli mahsulotlar yo'q", favs_hint: "Mahsulotdagi ❤️ belgisini bosing",
+      profile: 'Profil', active: 'Faol', history: 'Tarix', orders_empty: "Buyurtmalar hali yo'q", orders_hint: "Buyurtmalaringiz shu yerda ko'rinadi", shop_now: 'Xarid qilish',
+      order_n: 'Buyurtma #{id}', cancel: 'Bekor qilish', cancel_q: 'Buyurtmani bekor qilasizmi?', cancelled_ok: 'Buyurtma bekor qilindi', change_loc: '📍 Manzilni yangilash',
+      st_new: 'Yangi', st_accepted: 'Qabul qilindi', st_delivering: "Yo'lda", st_done: 'Yakunlandi', st_cancelled: 'Bekor qilindi',
+      about: 'Tavsif', phones: 'Telefon', addresses: 'Manzil', info: "Do'kon haqida",
+      reg_title: "Buyurtma berish uchun ro'yxatdan o'ting", reg_phone: 'Telefon raqam', reg_phone_sub: 'Raqamingiz Telegram orqali yuboriladi', share_phone: '📱 Raqamni ulashish',
+      reg_loc: 'Yetkazib berish manzili', reg_loc_sub: 'Buyurtmani qayerga olib borishimizni bilish uchun', share_loc: '📍 Joylashuvni yuborish', later: 'Keyinroq',
+      phone_saved: 'Raqam saqlandi ✓', loc_saved_t: 'Joylashuv saqlandi ✓', only_tg: "Bu sahifa faqat Telegram ichida ishlaydi.", open_tg: "Telegram'da ochish", retry: 'Qayta urinish',
+      qty: 'Miqdor', stock_limit: 'Omborda faqat {n} {u} bor', added: "Savatga qo'shildi",
+    },
+    ru: {
+      nav_catalog: 'Каталог', nav_cart: 'Корзина', nav_favs: 'Избранное', nav_orders: 'Заказы',
+      search: 'Поиск товаров...', all: 'Все', other: 'Другое', to_cart: 'В корзину', sold_out: 'Нет в наличии',
+      only_left: 'Осталось {n} {u}', in_stock: 'В наличии: {n} {u}', catalog_empty: 'Каталог пока пуст', nothing_found: 'Ничего не найдено',
+      cart: 'Корзина', cart_items: '{n} товаров', clear: 'Очистить', cart_empty: 'Корзина пуста', go_catalog: 'Перейти в каталог',
+      promo: 'Промокод', apply: 'Применить', promo_ok: 'Промокод применён', remove: 'Убрать',
+      min_order: 'Минимальный заказ — {s}', add_more: 'Добавьте ещё {s}', subtotal: 'Товары', discount: 'Скидка', delivery: 'Доставка',
+      free: 'Бесплатно', free_from: 'Бесплатная доставка от {s}', total: 'Итого', order: 'Оформить заказ', sending: 'Отправка...',
+      delivery_info: 'Доставка', loc_saved: '📍 Геолокация сохранена', loc_missing: '📍 Геолокация не отправлена', update: 'Обновить', send: 'Отправить',
+      address: 'Адрес / ориентир', optional: '(необязательно)', required: '(обязательно)', addr_ph: 'Например: возле рынка, магазин 2',
+      comment: 'Комментарий', comment_ph: 'Дополнительные пожелания...', need_loc: 'Укажите геолокацию или адрес',
+      order_ok: 'Заказ #{id} принят!', order_ok_sub: 'Скоро мы с вами свяжемся.', my_orders: 'Мои заказы', back_catalog: 'Вернуться в каталог',
+      favs: 'Избранное', favs_empty: 'Нет избранных товаров', favs_hint: 'Нажмите ❤️ на товаре',
+      profile: 'Профиль', active: 'Активные', history: 'История', orders_empty: 'Заказов пока нет', orders_hint: 'Здесь появятся ваши заказы', shop_now: 'За покупками',
+      order_n: 'Заказ #{id}', cancel: 'Отменить', cancel_q: 'Отменить заказ?', cancelled_ok: 'Заказ отменён', change_loc: '📍 Обновить адрес',
+      st_new: 'Новый', st_accepted: 'Принят', st_delivering: 'В пути', st_done: 'Завершён', st_cancelled: 'Отменён',
+      about: 'Описание', phones: 'Телефон', addresses: 'Адрес', info: 'О магазине',
+      reg_title: 'Зарегистрируйтесь, чтобы сделать заказ', reg_phone: 'Номер телефона', reg_phone_sub: 'Номер будет отправлен через Telegram', share_phone: '📱 Поделиться номером',
+      reg_loc: 'Адрес доставки', reg_loc_sub: 'Чтобы знать, куда доставить заказ', share_loc: '📍 Отправить геолокацию', later: 'Позже',
+      phone_saved: 'Номер сохранён ✓', loc_saved_t: 'Геолокация сохранена ✓', only_tg: 'Эта страница работает только в Telegram.', open_tg: 'Открыть в Telegram', retry: 'Повторить',
+      qty: 'Количество', stock_limit: 'На складе только {n} {u}', added: 'Добавлено в корзину',
+    }
+  };
+
+  const state = {
+    page: 'catalog',
+    lang: localStorage.getItem(LANG_KEY) || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code === 'ru') ? 'ru' : 'uz'),
+    shop: { name: 'XASANBOY OPTOM', logo: '', bot: '', description: '', phones: [], addresses: [], banners: [], delivery: {}, min_order: 0, promo_enabled: false },
+    me: null,
+    products: [],
+    byId: new Map(),
+    activeCat: '',
+    q: '',
+    showSearch: false,
+    cart: loadJson(CART_KEY, {}),
+    favs: loadJson(FAV_KEY, []),
+    orders: [],
+    ordersTab: 'active',
+    promo: null,
+    skipLocation: false,
+    busy: false,
+    subpage: ''
+  };
+
+  // ---------------- yordamchilar ----------------
+  function t(key, vars) {
+    let s = (I18N[state.lang] && I18N[state.lang][key]) || I18N.uz[key] || key;
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace('{' + k + '}', v);
+    return s;
+  }
+  function esc(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function cur() { return state.lang === 'ru' ? 'сум' : "so'm"; }
+  function money(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ' + cur(); }
+  function qtyFmt(n) { const f = Number(n) || 0; return Number.isInteger(f) ? String(f) : String(Math.round(f * 1000) / 1000); }
+  function dateFmt(ts) { const d = new Date(ts * 1000), p = v => String(v).padStart(2, '0'); return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+  function loadJson(k, d) { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch (_) { return d; } }
+  function saveJson(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  let toastT = null;
+  function toast(msg, err = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
+    clearTimeout(toastT); toastT = setTimeout(() => { el.className = 'toast' + (err ? ' err' : ''); }, 2600);
+  }
+  function haptic(type = 'light') { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(type); } catch (_) {} }
+  function cssId(id) { return String(id).replace(/[^a-zA-Z0-9_-]/g, '_'); }
+  function discPct(p) { return p.old_price > p.price && p.price > 0 ? Math.round((1 - p.price / p.old_price) * 100) : 0; }
+  function inStock(p) { return p.unlimited || (Number(p.stock) || 0) > 0; }
+  function maxQty(p) { return p.unlimited ? 100000 : (Number(p.stock) || 0); }
+  function catName(p) { return p.category || t('other'); }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      method: opts.method || 'GET',
+      headers: { 'Content-Type': 'application/json', 'X-Tg-Init': INIT },
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) throw new Error(data.error || ('Xato ' + res.status));
+    return data;
+  }
+
+  // ---------------- savat va sevimlilar ----------------
+  function saveCart() { saveJson(CART_KEY, state.cart); updateBadges(); }
+  function cartLines() {
+    return Object.entries(state.cart).map(([id, qty]) => ({ p: state.byId.get(id), qty: Number(qty) || 0 })).filter(x => x.p && x.qty > 0);
+  }
+  function cartSubtotal() { return cartLines().reduce((s, x) => s + x.p.price * x.qty, 0); }
+  function isFav(id) { return state.favs.includes(id); }
+  function toggleFav(id, ev) {
+    if (ev) ev.stopPropagation();
+    state.favs = isFav(id) ? state.favs.filter(x => x !== id) : [...state.favs, id];
+    saveJson(FAV_KEY, state.favs);
+    haptic();
+    updateBadges();
+    document.querySelectorAll(`[data-fav="${cssId(id)}"]`).forEach(el => { el.innerHTML = heartSvg(isFav(id)); });
+    if (state.page === 'favs') render();
+  }
+  function heartSvg(on) {
+    return on
+      ? '<svg viewBox="0 0 24 24" fill="#2F7CF6"><path d="M12 21s-7.5-4.7-9.8-9.2C.5 8.4 2.5 4 6.5 4c2.2 0 3.7 1.2 4.6 2.6l.9 1.3.9-1.3C13.8 5.2 15.3 4 17.5 4c4 0 6 4.4 4.3 7.8C19.5 16.3 12 21 12 21z"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M12 20s-7-4.4-9.2-8.6C1.2 8.2 3 4.5 6.6 4.5c2 0 3.4 1.1 4.4 2.5 1-1.4 2.4-2.5 4.4-2.5 3.6 0 5.4 3.7 3.8 6.9C19 15.6 12 20 12 20z"/></svg>';
+  }
+  function updateBadges() {
+    const set = (id, n) => { const b = document.getElementById(id); if (!b) return; b.textContent = n; b.classList.toggle('hidden', n === 0); };
+    set('cart-badge', cartLines().length);
+    set('fav-badge', state.favs.filter(id => state.byId.has(id)).length);
+  }
+
+  function changeQty(id, delta) {
+    const p = state.byId.get(id);
+    if (!p) return;
+    let q = (Number(state.cart[id]) || 0) + delta;
+    if (delta > 0 && q > maxQty(p)) { q = maxQty(p); toast(t('stock_limit', { n: qtyFmt(maxQty(p)), u: p.unit }), true); }
+    if (q <= 0) delete state.cart[id]; else state.cart[id] = q;
+    haptic();
+    saveCart();
+    state.promo = null;
+    refreshProduct(id);
+  }
+  function setQty(id, val) {
+    const p = state.byId.get(id);
+    if (!p) return;
+    let q = Math.max(0, Number(String(val).replace(',', '.')) || 0);
+    if (q > maxQty(p)) { q = maxQty(p); toast(t('stock_limit', { n: qtyFmt(maxQty(p)), u: p.unit }), true); }
+    if (q <= 0) delete state.cart[id]; else state.cart[id] = q;
+    saveCart();
+    state.promo = null;
+    render();
+  }
+  function refreshProduct(id) {
+    const p = state.byId.get(id);
+    document.querySelectorAll(`[data-card="${cssId(id)}"]`).forEach(el => { el.outerHTML = cardHtml(p); });
+    const sh = document.getElementById('sheet-actions');
+    if (sh && sh.dataset.id === id) sh.innerHTML = sheetActionsHtml(p);
+    if (state.page === 'cart') render();
+    else updateCartBar();
+  }
+
+  // ---------------- navigatsiya ----------------
+  function go(page) {
+    state.page = page;
+    state.subpage = '';
+    render();
+    window.scrollTo(0, 0);
+    if (page === 'orders') loadOrders();
+  }
+
+  function render() {
+    const app = document.getElementById('app');
+    const nav = document.getElementById('nav');
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    if (!INIT) {
+      nav.classList.add('hidden');
+      app.innerHTML = `<div class="reg"><div class="hero">${logoBig()}<h2>${esc(state.shop.name)}</h2></div>
+        <div class="stepbox"><p class="note">${t('only_tg')}</p>
+        ${state.shop.bot ? `<a class="btn" style="display:block;text-align:center" href="https://t.me/${esc(state.shop.bot)}">${t('open_tg')}</a>` : ''}</div></div>`;
+      return;
+    }
+    if (!state.me) { app.innerHTML = '<div class="spinner"></div>'; return; }
+    const needPhone = !state.me.registered;
+    const needLoc = state.me.lat == null && !state.skipLocation;
+    if (needPhone || needLoc) { nav.classList.add('hidden'); app.innerHTML = renderRegister(needPhone); return; }
+    nav.classList.remove('hidden');
+    document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === state.page));
+    if (state.subpage === 'info') app.innerHTML = renderInfo();
+    else if (state.page === 'cart') app.innerHTML = renderCart();
+    else if (state.page === 'favs') app.innerHTML = renderFavs();
+    else if (state.page === 'orders') app.innerHTML = renderOrders();
+    else { app.innerHTML = renderCatalog(); startBannerAuto(); }
+    updateBadges();
+  }
+
+  function logoBig() { return `<div class="logo-big">${state.shop.logo ? `<img src="${esc(state.shop.logo)}" alt="">` : 'XO'}</div>`; }
+  function picHtml(p, cls = '') {
+    return p.image ? `<img src="${esc(p.image)}" alt="" loading="lazy" class="${cls}">` : `<span class="ph">${esc((p.name || '?').trim().charAt(0).toUpperCase())}</span>`;
+  }
+  function topBar(title, left = 'info') {
+    const leftBtn = left === 'back'
+      ? `<button class="round" onclick="state.subpage=''; render(); window.scrollTo(0,0);">‹</button>`
+      : `<button class="round" onclick="state.subpage='info'; render(); window.scrollTo(0,0);" style="font-family:Georgia,serif;font-style:italic;font-weight:700">i</button>`;
+    return `
+      <div class="top"><div class="bar">
+        ${leftBtn}
+        <h1>${esc(title)}</h1>
+        <button class="round lang" onclick="toggleLang()">${state.lang === 'ru' ? 'UZ' : 'RU'}</button>
+        ${state.page === 'catalog' && !state.subpage ? `<button class="round" onclick="state.showSearch=!state.showSearch; render(); if(state.showSearch) setTimeout(()=>document.getElementById('q')?.focus(),50)">🔍</button>` : ''}
+      </div>
+      ${state.page === 'catalog' && !state.subpage && state.showSearch ? `<div class="search"><input id="q" placeholder="${t('search')}" value="${esc(state.q)}" oninput="state.q=this.value; renderCatalogBody()" /></div>` : ''}
+      </div>`;
+  }
+  function toggleLang() {
+    state.lang = state.lang === 'ru' ? 'uz' : 'ru';
+    localStorage.setItem(LANG_KEY, state.lang);
+    document.documentElement.lang = state.lang;
+    api('/api/me/lang', { method: 'POST', body: { lang: state.lang } }).catch(() => {});
+    render();
+  }
+
+  // ---------------- ro'yxatdan o'tish ----------------
+  function renderRegister(needPhone) {
+    return `
+      <div class="reg">
+        <div style="display:flex;justify-content:flex-end"><button class="round lang" onclick="toggleLang()">${state.lang === 'ru' ? 'UZ' : 'RU'}</button></div>
+        <div class="hero">${logoBig()}<h2>${esc(state.shop.name)}</h2><p class="note" style="margin-top:4px">${t('reg_title')}</p></div>
+        <div class="stepbox">
+          <div class="row"><span class="stepnum ${needPhone ? '' : 'done'}">${needPhone ? '1' : '✓'}</span>
+            <div><div class="h2">${t('reg_phone')}</div><div class="note">${needPhone ? t('reg_phone_sub') : `<span class="ok">${esc(state.me.phone)}</span>`}</div></div></div>
+          ${needPhone ? `<button class="btn" onclick="shareContact()" ${state.busy ? 'disabled' : ''}>${t('share_phone')}</button>` : ''}
+        </div>
+        <div class="stepbox" style="${needPhone ? 'opacity:.5' : ''}">
+          <div class="row"><span class="stepnum">2</span><div><div class="h2">${t('reg_loc')}</div><div class="note">${t('reg_loc_sub')}</div></div></div>
+          ${needPhone ? '' : `<button class="btn" onclick="shareLocation()" ${state.busy ? 'disabled' : ''}>${t('share_loc')}</button>
+            <button class="btn ghost" onclick="state.skipLocation = true; render();">${t('later')}</button>`}
+        </div>
+      </div>`;
+  }
+  async function refreshMe() { state.me = await api('/api/me'); return state.me; }
+  function shareContact() {
+    if (!tg || typeof tg.requestContact !== 'function' || !tg.isVersionAtLeast || !tg.isVersionAtLeast('6.9')) { toast("Telegram'ni yangilang yoki botga /start yozing", true); return; }
+    state.busy = true; render();
+    tg.requestContact(async (shared, res) => {
+      try {
+        if (!shared) { toast('—', true); return; }
+        if (res && res.response) { try { await api('/api/me/contact', { method: 'POST', body: { response: res.response } }); } catch (e) { console.warn(e); } }
+        for (let i = 0; i < 8; i++) { await refreshMe(); if (state.me.registered) break; await new Promise(r => setTimeout(r, 800)); }
+        if (state.me.registered) { haptic('medium'); toast(t('phone_saved')); }
+      } catch (e) { toast(e.message, true); }
+      finally { state.busy = false; render(); }
+    });
+  }
+  function getLocation() {
+    return new Promise((resolve, reject) => {
+      const viaBrowser = () => {
+        if (!navigator.geolocation) return reject(new Error("Joylashuvni aniqlab bo'lmadi"));
+        navigator.geolocation.getCurrentPosition(p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }), () => reject(new Error('Joylashuvga ruxsat berilmadi')), { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+      };
+      const LM = tg && tg.LocationManager;
+      if (LM && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')) {
+        LM.init(() => {
+          if (!LM.isLocationAvailable) return viaBrowser();
+          LM.getLocation(loc => {
+            if (loc && loc.latitude != null) resolve({ lat: loc.latitude, lng: loc.longitude });
+            else if (!LM.isAccessGranted && LM.isAccessRequested) { try { LM.openSettings(); } catch (_) {} reject(new Error('Ruxsat berilmagan')); }
+            else viaBrowser();
+          });
+        });
+      } else viaBrowser();
+    });
+  }
+  async function shareLocation() {
+    state.busy = true; render();
+    try {
+      const loc = await getLocation();
+      await api('/api/me/location', { method: 'POST', body: loc });
+      await refreshMe(); haptic('medium'); toast(t('loc_saved_t'));
+    } catch (e) { toast(e.message, true); }
+    finally { state.busy = false; render(); }
+  }
+
+  // ---------------- katalog ----------------
+  function categories() {
+    const seen = [];
+    for (const p of state.products) { const c = catName(p); if (!seen.includes(c)) seen.push(c); }
+    return seen;
+  }
+  function renderCatalog() {
+    const b = state.shop.banners || [];
+    return `
+      ${topBar(state.shop.name)}
+      ${b.length && !state.q ? `
+        <div class="banners">
+          <div class="slides" id="slides" onscroll="onSlidesScroll(this)">
+            ${b.map(x => `<div class="slide">${x.link ? `<a href="${esc(x.link)}" target="_blank">` : ''}<img src="${esc(x.image)}" alt="">${x.link ? '</a>' : ''}</div>`).join('')}
+          </div>
+          ${b.length > 1 ? `<div class="dots">${b.map((_, i) => `<span class="dot ${i === 0 ? 'on' : ''}"></span>`).join('')}</div>` : ''}
+        </div>` : ''}
+      <div id="cat-body">${catalogBodyHtml()}</div>
+      <div id="cartbar-wrap">${cartBarHtml()}</div>`;
+  }
+  function catalogBodyHtml() {
+    if (!state.products.length) return `<div class="empty"><b>🛒</b>${t('catalog_empty')}</div>`;
+    const q = state.q.trim().toLowerCase();
+    if (q) {
+      const list = state.products.filter(p => (p.name || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q));
+      return list.length ? `<div class="grid">${list.map(cardHtml).join('')}</div>` : `<div class="empty"><b>🔍</b>${t('nothing_found')}</div>`;
+    }
+    const cats = categories();
+    return `
+      <div class="chips" id="chips">${cats.map((c, i) => `<button class="chip ${i === 0 ? 'on' : ''}" data-cat="${esc(c)}" onclick="scrollToCat(this.dataset.cat)">${esc(c)}</button>`).join('')}</div>
+      ${cats.map(c => `
+        <div class="cat-sec" data-sec="${esc(c)}">
+          <div class="sec-title">${esc(c)}</div>
+          <div class="grid">${state.products.filter(p => catName(p) === c).map(cardHtml).join('')}</div>
+        </div>`).join('')}`;
+  }
+  function renderCatalogBody() { const el = document.getElementById('cat-body'); if (el) el.innerHTML = catalogBodyHtml(); }
+  function scrollToCat(c) {
+    const sec = document.querySelector(`.cat-sec[data-sec="${CSS.escape(c)}"]`);
+    if (!sec) return;
+    const y = sec.getBoundingClientRect().top + window.scrollY - 118;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+    setActiveChip(c);
+  }
+  function setActiveChip(c) {
+    if (state.activeCat === c) return;
+    state.activeCat = c;
+    document.querySelectorAll('#chips .chip').forEach(el => {
+      const on = el.dataset.cat === c;
+      el.classList.toggle('on', on);
+      if (on) el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    });
+  }
+  window.addEventListener('scroll', () => {
+    if (state.page !== 'catalog' || state.subpage || state.q) return;
+    let current = null;
+    document.querySelectorAll('.cat-sec').forEach(sec => { if (sec.getBoundingClientRect().top < 140) current = sec.dataset.sec; });
+    if (current) setActiveChip(current);
+  }, { passive: true });
+
+  let bannerTimer = null;
+  function onSlidesScroll(el) {
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    document.querySelectorAll('.dots .dot').forEach((d, k) => d.classList.toggle('on', k === i));
+  }
+  function startBannerAuto() {
+    clearInterval(bannerTimer);
+    const n = (state.shop.banners || []).length;
+    if (n < 2) return;
+    bannerTimer = setInterval(() => {
+      const el = document.getElementById('slides');
+      if (!el) { clearInterval(bannerTimer); return; }
+      const i = Math.round(el.scrollLeft / el.clientWidth);
+      el.scrollTo({ left: ((i + 1) % n) * el.clientWidth, behavior: 'smooth' });
+    }, 4000);
+  }
+
+  function stockHtml(p) {
+    if (p.unlimited) return '';
+    const n = Number(p.stock) || 0;
+    if (n <= 0) return `<div class="stock">${t('sold_out')}</div>`;
+    if (n <= 5) return `<div class="stock low">${t('only_left', { n: qtyFmt(n), u: esc(p.unit) })}</div>`;
+    return `<div class="stock">${t('in_stock', { n: qtyFmt(n), u: esc(p.unit) })}</div>`;
+  }
+  function cardHtml(p) {
+    const q = Number(state.cart[p.id]) || 0;
+    const pct = discPct(p);
+    const ok = inStock(p);
+    return `
+      <div class="card" data-card="${cssId(p.id)}" onclick="openProduct('${cssId(p.id)}')">
+        <div class="pic">
+          ${picHtml(p)}
+          ${pct ? `<span class="badge-disc">-${pct}%</span>` : ''}
+          <button class="fav" data-fav="${cssId(p.id)}" data-id="${esc(p.id)}" onclick="toggleFav(this.dataset.id, event)">${heartSvg(isFav(p.id))}</button>
+          ${ok ? '' : `<div class="out">${t('sold_out')}</div>`}
+        </div>
+        <div class="body">
+          <div class="name">${esc(p.name)}</div>
+          <div class="price ${pct ? 'disc' : ''}">${money(p.price)}</div>
+          ${pct ? `<div class="old">${money(p.old_price)}</div>` : ''}
+          ${stockHtml(p)}
+          <div onclick="event.stopPropagation()" style="margin-top:auto;padding-top:6px">
+            ${q > 0
+              ? `<div class="step"><button data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,-1)">−</button><span>${qtyFmt(q)}</span><button data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,1)">+</button></div>`
+              : `<button class="add" style="width:100%" data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,1)" ${ok ? '' : 'disabled'}>${t('to_cart')}</button>`}
+          </div>
+        </div>
+      </div>`;
+  }
+  function cartBarHtml() {
+    const lines = cartLines();
+    if (!lines.length || state.page !== 'catalog') return '';
+    return `<div class="cartbar" onclick="go('cart')"><div><span>${t('cart_items', { n: lines.length })}</span><br><b>${money(cartSubtotal())}</b></div><b>${t('cart')} →</b></div>`;
+  }
+  function updateCartBar() { const w = document.getElementById('cartbar-wrap'); if (w) w.innerHTML = cartBarHtml(); }
+
+  // ---------------- mahsulot oynasi ----------------
+  function findByCss(cid) { for (const p of state.products) if (cssId(p.id) === cid) return p; return null; }
+  function openProduct(cid) {
+    const p = findByCss(cid);
+    if (!p) return;
+    const imgs = p.images && p.images.length ? p.images : [];
+    const pct = discPct(p);
+    document.getElementById('sheet-root').innerHTML = `
+      <div class="sheet-bg" onclick="if(event.target===this) closeSheet()">
+        <div class="sheet" style="position:relative">
+          <button class="sheet-close" onclick="closeSheet()">✕</button>
+          <div class="gallery" onscroll="const i=Math.round(this.scrollLeft/this.clientWidth); document.querySelectorAll('#gdots .dot').forEach((d,k)=>d.classList.toggle('on',k===i))">
+            ${imgs.length ? imgs.map(src => `<div><img src="${esc(src)}" alt=""></div>`).join('') : `<div><span class="ph" style="font-size:60px;color:#CBD5E1;font-weight:900">${esc(p.name.charAt(0))}</span></div>`}
+          </div>
+          ${imgs.length > 1 ? `<div class="dots" id="gdots">${imgs.map((_, i) => `<span class="dot ${i === 0 ? 'on' : ''}"></span>`).join('')}</div>` : ''}
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+            <div class="row between" style="align-items:flex-start">
+              <div style="font-size:19px;font-weight:800;line-height:1.3">${esc(p.name)}</div>
+              <button class="fav" style="position:static;flex-shrink:0" data-fav="${cssId(p.id)}" data-id="${esc(p.id)}" onclick="toggleFav(this.dataset.id, event)">${heartSvg(isFav(p.id))}</button>
+            </div>
+            <div class="row" style="gap:8px;align-items:baseline">
+              <span class="price ${pct ? 'disc' : ''}" style="font-size:22px">${money(p.price)}</span>
+              ${pct ? `<span class="old" style="font-size:14px">${money(p.old_price)}</span><span class="badge-disc" style="position:static">-${pct}%</span>` : ''}
+            </div>
+            ${stockHtml(p)}
+            ${p.description ? `<div class="note" style="font-size:14px;color:#334155;white-space:pre-line">${esc(p.description)}</div>` : ''}
+            <div id="sheet-actions" data-id="${esc(p.id)}" style="margin-top:6px">${sheetActionsHtml(p)}</div>
+          </div>
+        </div>
+      </div>`;
+    try { tg && tg.BackButton && (tg.BackButton.show(), tg.BackButton.onClick(closeSheet)); } catch (_) {}
+  }
+  function sheetActionsHtml(p) {
+    const q = Number(state.cart[p.id]) || 0;
+    if (!inStock(p)) return `<button class="btn" disabled>${t('sold_out')}</button>`;
+    if (q > 0) return `
+      <div class="row">
+        <div class="step" style="flex:1;height:52px"><button style="height:52px" data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,-1)">−</button><span>${qtyFmt(q)} ${esc(p.unit)}</span><button style="height:52px" data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,1)">+</button></div>
+        <button class="btn" style="flex:1" onclick="closeSheet(); go('cart')">${t('cart')} →</button>
+      </div>`;
+    return `<button class="btn" data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,1); toast(t('added'))">${t('to_cart')}</button>`;
+  }
+  function closeSheet() {
+    document.getElementById('sheet-root').innerHTML = '';
+    try { tg && tg.BackButton && (tg.BackButton.offClick(closeSheet), tg.BackButton.hide()); } catch (_) {}
+  }
+
+  // ---------------- savat ----------------
+  function calcTotals() {
+    const sub = cartSubtotal();
+    const disc = state.promo ? Math.min(sub, Number(state.promo.discount) || 0) : 0;
+    const d = state.shop.delivery || {};
+    let fee = 0;
+    if (d.enabled) fee = (Number(d.free_from) > 0 && sub - disc >= Number(d.free_from)) ? 0 : Number(d.price) || 0;
+    return { sub, disc, fee, total: sub - disc + fee };
+  }
+  function renderCart() {
+    const lines = cartLines();
+    const head = `<div class="top"><div class="bar"><button class="round" onclick="go('catalog')">‹</button><div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:800">${t('cart')}</div><div class="s">${t('cart_items', { n: lines.length })}</div></div>${lines.length ? `<button class="s" style="font-weight:700" onclick="state.cart={}; state.promo=null; saveCart(); render();">${t('clear')}</button>` : '<span style="width:40px"></span>'}</div></div>`;
+    if (!lines.length) return head + `<div class="empty"><b>🛒</b>${t('cart_empty')}<br><br><button class="btn soft" style="max-width:240px" onclick="go('catalog')">${t('go_catalog')}</button></div>`;
+    const me = state.me;
+    const hasLoc = me.lat != null;
+    const min = Number(state.shop.min_order) || 0;
+    const tot = calcTotals();
+    const short = min > 0 && tot.sub < min ? min - tot.sub : 0;
+    const d = state.shop.delivery || {};
+    return head + `
+      <div class="section">
+        <div class="box" style="padding:4px 14px">
+          ${lines.map(({ p, qty }) => `
+            <div class="citem">
+              <div class="thumb" onclick="openProduct('${cssId(p.id)}')">${p.image ? `<img src="${esc(p.image)}" alt="">` : esc(p.name.charAt(0))}</div>
+              <div class="info"><div class="t">${esc(p.name)}</div><div class="s">${money(p.price)}</div><div class="s" style="color:var(--ink);font-weight:700">${money(p.price * qty)}</div></div>
+              <div class="mini-step">
+                <button data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,-1)">−</button>
+                <input type="number" inputmode="decimal" min="0" step="any" value="${qtyFmt(qty)}" data-id="${esc(p.id)}" onchange="setQty(this.dataset.id, this.value)" />
+                <button data-id="${esc(p.id)}" onclick="changeQty(this.dataset.id,1)">+</button>
+              </div>
+            </div>`).join('')}
+        </div>
+
+        ${state.shop.promo_enabled ? `
+          <div class="box">
+            ${state.promo ? `
+              <div class="row between"><div><div class="h2">🏷 ${esc(state.promo.code)}</div><div class="s ok">${t('promo_ok')}: −${money(tot.disc)}</div></div>
+              <button class="pill st-cancelled" onclick="state.promo=null; render()">${t('remove')}</button></div>
+            ` : `
+              <div class="row"><input id="promo" class="field" placeholder="${t('promo')}" style="text-transform:uppercase;letter-spacing:1px" />
+              <button class="btn soft" style="width:auto;padding:11px 16px" onclick="applyPromo()">${t('apply')}</button></div>`}
+          </div>` : ''}
+
+        <div class="box">
+          <div class="h2">${t('delivery_info')}</div>
+          <div class="note" style="margin-top:4px">👤 ${esc(me.name || '')} • 📞 ${esc(me.phone)}</div>
+          <div class="row between" style="margin-top:6px">
+            <div class="note">${hasLoc ? `<span class="ok">${t('loc_saved')}</span>` : `<span class="warn">${t('loc_missing')}</span>`}</div>
+            <button class="pill st-new" onclick="shareLocation()" ${state.busy ? 'disabled' : ''}>${hasLoc ? t('update') : t('send')}</button>
+          </div>
+          <div class="label">${t('address')} ${hasLoc ? t('optional') : t('required')}</div>
+          <input id="addr" class="field" placeholder="${t('addr_ph')}" value="${esc(me.address || '')}" />
+          <div class="label">${t('comment')} ${t('optional')}</div>
+          <textarea id="comment" class="field" rows="2" placeholder="${t('comment_ph')}"></textarea>
+          ${d.enabled && Number(d.free_from) > 0 ? `<div class="note" style="margin-top:8px">🚚 ${t('free_from', { s: money(d.free_from) })}</div>` : ''}
+          ${d.note ? `<div class="note" style="margin-top:4px">ℹ️ ${esc(d.note)}</div>` : ''}
+        </div>
+
+        ${short ? `<div class="warn-box">⚠️ ${t('min_order', { s: money(min) })}</div>` : ''}
+
+        <div class="box">
+          <div class="sumrow"><span>${t('subtotal')}</span><span>${money(tot.sub)}</span></div>
+          ${tot.disc ? `<div class="sumrow" style="color:var(--green)"><span>${t('discount')}</span><span>−${money(tot.disc)}</span></div>` : ''}
+          ${d.enabled ? `<div class="sumrow"><span>${t('delivery')}</span><span>${tot.fee ? money(tot.fee) : t('free')}</span></div>` : ''}
+          <div class="total"><span>${t('total')}</span><span>${money(tot.total)}</span></div>
+        </div>
+        <button class="btn" id="order-btn" onclick="placeOrder()" ${state.busy || short ? 'disabled' : ''}>${short ? t('add_more', { s: money(short) }) : t('order')}</button>
+      </div>`;
+  }
+  async function applyPromo() {
+    const code = (document.getElementById('promo')?.value || '').trim();
+    if (!code) return;
+    try {
+      const r = await api('/api/promo/check', { method: 'POST', body: { code, subtotal: cartSubtotal() } });
+      state.promo = { code: r.code, discount: r.discount };
+      haptic('medium');
+      render();
+    } catch (e) { toast(e.message, true); }
+  }
+  async function placeOrder() {
+    const lines = cartLines();
+    if (!lines.length) return;
+    const address = (document.getElementById('addr')?.value || '').trim();
+    const comment = (document.getElementById('comment')?.value || '').trim();
+    if (state.me.lat == null && !address) { toast(t('need_loc'), true); return; }
+    state.busy = true;
+    const btn = document.getElementById('order-btn');
+    if (btn) { btn.disabled = true; btn.textContent = t('sending'); }
+    try {
+      const res = await api('/api/orders', { method: 'POST', body: { items: lines.map(x => ({ id: x.p.id, qty: x.qty })), address, comment, promo_code: state.promo ? state.promo.code : '' } });
+      state.cart = {}; state.promo = null; saveCart();
+      try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (_) {}
+      state.busy = false;
+      document.getElementById('app').innerHTML = `
+        <div class="reg"><div class="hero"><div style="font-size:64px">✅</div><h2>${t('order_ok', { id: res.order_id })}</h2>
+        <p class="note" style="margin-top:6px">${t('total')}: <b>${money(res.total)}</b><br>${t('order_ok_sub')}</p></div>
+        <button class="btn" onclick="go('orders')">${t('my_orders')}</button>
+        <button class="btn ghost" onclick="go('catalog')">${t('back_catalog')}</button></div>`;
+      refreshCatalog();
+    } catch (e) { state.busy = false; toast(e.message, true); render(); }
+  }
+
+  // ---------------- sevimlilar ----------------
+  function renderFavs() {
+    const list = state.favs.map(id => state.byId.get(id)).filter(Boolean);
+    const head = `<div class="top"><div class="bar"><button class="round" onclick="go('catalog')">‹</button><h1 style="text-align:center">${t('favs')}</h1><span style="width:40px"></span></div></div>`;
+    if (!list.length) return head + `<div class="empty"><b>🤍</b>${t('favs_empty')}<br><span class="note">${t('favs_hint')}</span></div>`;
+    return head + `<div class="grid" style="padding-top:12px">${list.map(cardHtml).join('')}</div>`;
+  }
+
+  // ---------------- buyurtmalar / profil ----------------
+  async function loadOrders() {
+    try { const r = await api('/api/my/orders'); state.orders = r.orders || []; if (state.page === 'orders') render(); }
+    catch (e) { toast(e.message, true); }
+  }
+  function renderOrders() {
+    const me = state.me;
+    const active = state.orders.filter(o => ['new', 'accepted', 'delivering'].includes(o.status));
+    const hist = state.orders.filter(o => !['new', 'accepted', 'delivering'].includes(o.status));
+    const list = state.ordersTab === 'active' ? active : hist;
+    return `
+      <div class="top"><div class="bar"><button class="round" onclick="go('catalog')">‹</button><h1 style="text-align:center">${t('profile')}</h1><button class="round lang" onclick="toggleLang()">${state.lang === 'ru' ? 'UZ' : 'RU'}</button></div></div>
+      <div class="section">
+        <div class="box row between">
+          <div class="row"><div class="logo-big" style="width:56px;height:56px;border-radius:50%;margin:0;font-size:20px">${esc((me.name || '?').charAt(0).toUpperCase())}</div>
+          <div><div style="font-size:18px;font-weight:800">${esc(me.name || '')}</div><div class="s">${esc(me.phone)}</div></div></div>
+          <button class="s" style="color:var(--blue);font-weight:700" onclick="shareLocation()">${t('change_loc')}</button>
+        </div>
+        <div class="tabs2">
+          <button class="${state.ordersTab === 'active' ? 'on' : ''}" onclick="state.ordersTab='active'; render()">${t('active')}${active.length ? ` (${active.length})` : ''}</button>
+          <button class="${state.ordersTab === 'history' ? 'on' : ''}" onclick="state.ordersTab='history'; render()">${t('history')}</button>
+        </div>
+        ${!list.length ? `<div class="empty" style="padding:40px 20px"><b>📋</b><div class="h2" style="color:var(--ink)">${t('orders_empty')}</div><div class="note">${t('orders_hint')}</div><br><button class="btn" style="max-width:220px" onclick="go('catalog')">${t('shop_now')}</button></div>` :
+          list.map(o => `
+            <div class="box">
+              <div class="row between"><div><div class="h2">${t('order_n', { id: o.id })}</div><div class="s">${dateFmt(o.created_at)}</div></div>
+              <span class="pill st-${esc(o.status)}">${t('st_' + o.status)}</span></div>
+              <div style="margin-top:6px">
+                ${o.items.map(it => { const p = state.byId.get(it.product_id); return `
+                  <div class="citem" style="padding:8px 0">
+                    <div class="thumb" style="width:48px;height:48px">${p && p.image ? `<img src="${esc(p.image)}" alt="">` : esc((it.name || '?').charAt(0))}</div>
+                    <div class="info"><div class="t">${esc(it.name)}</div><div class="s">${qtyFmt(it.qty)} ${esc(it.unit)} × ${money(it.price)}</div></div>
+                  </div>`; }).join('')}
+              </div>
+              ${o.discount ? `<div class="sumrow" style="color:var(--green)"><span>${t('discount')} ${esc(o.promo_code || '')}</span><span>−${money(o.discount)}</span></div>` : ''}
+              ${o.delivery_fee ? `<div class="sumrow"><span>${t('delivery')}</span><span>${money(o.delivery_fee)}</span></div>` : ''}
+              <div class="total" style="font-size:16px"><span>${t('total')}</span><span>${money(o.total)}</span></div>
+              ${o.status === 'new' ? `<button class="btn red" style="margin-top:10px;padding:11px" onclick="cancelOrder(${Number(o.id)})">${t('cancel')}</button>` : ''}
+            </div>`).join('')}
+      </div>`;
+  }
+  async function cancelOrder(id) {
+    const doIt = async () => {
+      try { await api(`/api/my/orders/${id}/cancel`, { method: 'POST', body: {} }); toast(t('cancelled_ok')); loadOrders(); }
+      catch (e) { toast(e.message, true); }
+    };
+    if (tg && tg.showConfirm) tg.showConfirm(t('cancel_q'), ok => { if (ok) doIt(); });
+    else if (confirm(t('cancel_q'))) doIt();
+  }
+
+  // ---------------- do'kon haqida ----------------
+  function renderInfo() {
+    const s = state.shop;
+    const tgLink = ph => 'https://t.me/' + String(ph).replace(/[^\d+]/g, '');
+    return `
+      ${topBar(s.name, 'back')}
+      <div class="section">
+        <div class="box row" style="align-items:flex-start">${logoBig().replace('logo-big', 'logo-big" style="width:64px;height:64px;margin:0')}<div><div class="h2" style="font-size:18px">${esc(s.name)}</div>${s.bot ? `<div class="s">@${esc(s.bot)}</div>` : ''}</div></div>
+        ${s.description ? `<div class="box row" style="align-items:flex-start"><div class="icon-tile" style="background:#2F7CF6;color:#fff">🏪</div><div><div class="s" style="color:var(--blue);font-weight:700;letter-spacing:.5px">${t('about').toUpperCase()}</div><div style="font-size:15px;margin-top:4px;white-space:pre-line">${esc(s.description)}</div></div></div>` : ''}
+        ${(s.phones || []).length ? `<div class="box"><div class="row"><div class="icon-tile" style="background:#22C55E;color:#fff">📞</div><div class="s" style="color:var(--blue);font-weight:700;letter-spacing:.5px">${t('phones').toUpperCase()}</div></div>
+          ${s.phones.map(ph => `<div class="row between" style="padding:12px 0;border-bottom:1px solid var(--line)"><span style="font-size:16px;font-weight:600">${esc(ph)}</span>
+            <div class="row" style="gap:8px"><a class="act" href="${tgLink(ph)}" target="_blank">✈️</a><a class="act" href="tel:${esc(String(ph).replace(/[^\d+]/g, ''))}">📞</a></div></div>`).join('')}</div>` : ''}
+        ${(s.addresses || []).length ? `<div class="box"><div class="row"><div class="icon-tile" style="background:#F97316;color:#fff">📍</div><div class="s" style="color:var(--blue);font-weight:700;letter-spacing:.5px">${t('addresses').toUpperCase()}</div></div>
+          ${s.addresses.map(a => `<div class="row between" style="padding:12px 0"><span style="font-size:15px">${esc(a.text)}</span>
+            ${a.lat != null ? `<a class="act" href="https://maps.google.com/?q=${Number(a.lat)},${Number(a.lng)}" target="_blank">🗺️</a>` : ''}</div>`).join('')}</div>` : ''}
+      </div>`;
+  }
+
+  // ---------------- ishga tushirish ----------------
+  async function refreshCatalog() {
+    try {
+      const cat = await api('/api/catalog');
+      state.products = cat.products || [];
+      state.byId = new Map(state.products.map(p => [p.id, p]));
+      for (const id of Object.keys(state.cart)) if (!state.byId.has(id)) delete state.cart[id];
+      saveCart();
+    } catch (_) {}
+  }
+  async function boot() {
+    document.documentElement.lang = state.lang;
+    if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor('#FFFFFF'); tg.setBackgroundColor && tg.setBackgroundColor('#F5F6F9'); } catch (_) {} }
+    try { state.shop = { ...state.shop, ...(await api('/api/shop')) }; } catch (_) {}
+    if (!INIT) { render(); return; }
+    try {
+      const [me, cat] = await Promise.all([api('/api/me'), api('/api/catalog')]);
+      state.me = me;
+      if (me.lang && !localStorage.getItem(LANG_KEY)) state.lang = me.lang;
+      state.products = cat.products || [];
+      state.byId = new Map(state.products.map(p => [p.id, p]));
+      for (const id of Object.keys(state.cart)) if (!state.byId.has(id)) delete state.cart[id];
+      saveCart();
+    } catch (e) {
+      document.getElementById('app').innerHTML = `<div class="empty"><b>⚠️</b>${esc(e.message)}<br><br><button class="btn soft" style="max-width:200px" onclick="location.reload()">${t('retry')}</button></div>`;
+      return;
+    }
+    go('catalog');
+  }
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || !INIT || !state.me) return;
+    await refreshCatalog();
+    try { state.shop = { ...state.shop, ...(await api('/api/shop')) }; } catch (_) {}
+    if (state.page === 'catalog' && !document.getElementById('sheet-root').innerHTML) render();
+  });
+  boot();
+</script>
+</body>
+</html>
