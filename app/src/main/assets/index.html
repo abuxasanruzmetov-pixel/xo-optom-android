@@ -141,6 +141,9 @@
           🛍️
           <span data-online-badge class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">0</span>
         </button>
+        <button type="button" onclick="openShopSettings()" title="Onlayn do'kon sozlamalari" class="w-9 h-9 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold">
+          🔑
+        </button>
         <button type="button" onclick="openPrinterModal()" title="Printer sozlamalari" class="w-9 h-9 rounded-xl bg-violet-50 hover:bg-violet-100 text-[#5b3df5] flex items-center justify-center text-sm font-bold">
           🖨️
         </button>
@@ -1051,6 +1054,7 @@
                     </div>
                     <div class="text-[11px] text-slate-600 mt-1 font-semibold">
                       Qoldiq: <span class="text-slate-900 font-extrabold">${Number(prod.qty) || 0} ${escapeHtml(prod.unit || 'dona')}</span> • Sotuv: <span class="text-emerald-700 font-extrabold">${formatMoney(prod.price)}</span> • Tannarx: ${formatMoney(prod.cost)}
+                      ${Number(prod.oldPrice) > Number(prod.price) ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-black">−${Math.round((1 - prod.price / prod.oldPrice) * 100)}%</span>` : ''}${prod.unlimited ? '<span class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-black">♾️</span>' : ''}${prod.online === false ? '<span class="ml-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-black">onlaynda yo\'q</span>' : ''}
                     </div>
                     ${prod.supplierName ? `
                       <div class="text-[11px] text-[#5b3df5] font-bold mt-1">
@@ -1060,7 +1064,10 @@
                   </div>
 
                   <div class="flex flex-col gap-1 shrink-0">
-                    <button type="button" onclick="openQuickStockAdjustModal('${prod.id}')" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-extrabold">± Qoldiq</button>
+                    <div class="flex gap-1">
+                      <button type="button" onclick="openQuickStockAdjustModal('${prod.id}')" class="flex-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-extrabold">± Qoldiq</button>
+                      ${onlineReady() && prod.online !== false ? `<button type="button" onclick="openPostProductModal('${prod.id}')" title="Kanalga joylash" class="px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-[11px] font-bold">📢</button>` : ''}
+                    </div>
                     <div class="flex gap-1">
                       <button type="button" onclick="openProductModal('${prod.id}')" class="px-2.5 py-1 rounded-lg bg-violet-50 hover:bg-violet-100 text-[#5b3df5] text-[11px] font-bold">Tahrir</button>
                       <button type="button" onclick="confirmDeleteProduct('${prod.id}')" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold">O'chir</button>
@@ -1120,7 +1127,7 @@
     function openProductModal(editProductId = null, prefillBarcode = '') {
       const existing = editProductId ? appState.products.find(p => p.id === editProductId) : null;
       if (existing && !guardOwnerAction("Mahsulotni tahrirlash faqat Egasi rejimida mumkin")) return;
-      if (!keepProductImageDraft) productImageDraft = undefined;
+      if (!keepProductImageDraft) { productImageDraft = undefined; extraImageDrafts = {}; }
       keepProductImageDraft = false;
 
       const selectedSupId = existing?.supplierId || '';
@@ -1180,10 +1187,27 @@
             <input id="prod-favorite" type="checkbox" ${existing?.favorite ? 'checked' : ''} class="w-4 h-4 accent-amber-500" />
           </label>
 
-          <label class="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs font-bold text-slate-800">
-            <span>🌐 Onlayn katalogda (Telegram) ko'rsatish</span>
-            <input id="prod-online" type="checkbox" ${existing?.online === false ? '' : 'checked'} class="w-4 h-4 accent-emerald-600" />
-          </label>
+          <details class="rounded-2xl bg-emerald-50/50 border border-emerald-200/80" ${existing && (existing.description || Number(existing.oldPrice) > 0 || existing.unlimited) ? 'open' : ''}>
+            <summary class="p-2.5 text-xs font-black text-slate-900 cursor-pointer select-none">🌐 Onlayn do'kon (Telegram) uchun</summary>
+            <div class="px-2.5 pb-2.5 space-y-2">
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-emerald-200/80 text-xs font-bold text-slate-800">
+                <span>Onlayn katalogda ko'rsatish</span>
+                <input id="prod-online" type="checkbox" ${existing?.online === false ? '' : 'checked'} class="w-4 h-4 accent-emerald-600" />
+              </label>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Tavsif</label>
+                <textarea id="prod-desc" rows="2" maxlength="2000" placeholder="Masalan: Turkiya, 3 kg chelak, yaroqlilik 12 oy" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white">${escapeHtml(existing?.description || '')}</textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Eski narx (chegirma uchun)</label>
+                <input id="prod-old-price" type="number" step="any" min="0" value="${existing && Number(existing.oldPrice) > 0 ? Number(existing.oldPrice) : ''}" placeholder="Sotuv narxidan katta bo'lsa −% ko'rinadi" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold bg-white" />
+              </div>
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-emerald-200/80 text-xs font-bold text-slate-800">
+                <span>♾️ Cheksiz qoldiq (tugamaydi)</span>
+                <input id="prod-unlimited" type="checkbox" ${existing?.unlimited ? 'checked' : ''} class="w-4 h-4 accent-emerald-600" />
+              </label>
+            </div>
+          </details>
 
           <!-- Ta'minotchi qidirish / yaratish va qisman to'lov kalkulyatori -->
           <div class="p-3 rounded-2xl bg-violet-50/70 border border-violet-200/80 space-y-2.5">
@@ -1404,6 +1428,9 @@
       const favorite = Boolean(document.getElementById('prod-favorite')?.checked);
       const onlineEl = document.getElementById('prod-online');
       const online = onlineEl ? onlineEl.checked : true;
+      const description = (document.getElementById('prod-desc')?.value || '').trim();
+      const oldPrice = Math.max(0, Number(document.getElementById('prod-old-price')?.value) || 0);
+      const unlimited = Boolean(document.getElementById('prod-unlimited')?.checked);
 
       if (!name) {
         showToast("Mahsulot nomini kiriting", 'error');
@@ -1430,6 +1457,9 @@
           prod.price = price;
           prod.favorite = favorite;
           prod.online = online;
+          prod.description = description;
+          prod.oldPrice = oldPrice;
+          prod.unlimited = unlimited;
           prod.supplierId = supObj ? supObj.id : '';
           prod.supplierName = supObj ? supObj.name : '';
         }
@@ -1453,6 +1483,9 @@
         price,
         favorite,
         online,
+        description,
+        oldPrice,
+        unlimited,
         supplierId: supObj ? supObj.id : '',
         supplierName: supObj ? supObj.name : ''
       });
@@ -1511,6 +1544,8 @@
         () => {
           appState.products = appState.products.filter(p => p.id !== productId);
           imgDel('p_' + productId);
+          imgDel('p_' + productId + '__1');
+          imgDel('p_' + productId + '__2');
           saveAppState();
           renderActiveTab();
           showToast("Mahsulot o'chirildi", 'info');
@@ -1641,7 +1676,7 @@
 
     // Tovar formasidagi ma'lumotlar skaner ochilganda yo'qolmasligi uchun
     let productFormStash = null;
-    const PRODUCT_FORM_FIELDS = ['prod-name', 'prod-category', 'prod-unit', 'prod-barcode', 'prod-qty', 'prod-cost', 'prod-price', 'prod-supplier-select', 'inline-sup-pay-channel', 'inline-sup-paid-amount'];
+    const PRODUCT_FORM_FIELDS = ['prod-name', 'prod-category', 'prod-unit', 'prod-barcode', 'prod-qty', 'prod-cost', 'prod-price', 'prod-desc', 'prod-old-price', 'prod-supplier-select', 'inline-sup-pay-channel', 'inline-sup-paid-amount'];
 
     function stashProductFormAndScan(editId) {
       const values = {};
@@ -1651,6 +1686,7 @@
       });
       values.__favorite = Boolean(document.getElementById('prod-favorite')?.checked);
       values.__online = document.getElementById('prod-online') ? document.getElementById('prod-online').checked : true;
+      values.__unlimited = Boolean(document.getElementById('prod-unlimited')?.checked);
       productFormStash = { editId: editId || null, values };
       openScannerModal('add_product');
     }
@@ -1671,6 +1707,8 @@
       if (fav) fav.checked = stash.values.__favorite;
       const onl = document.getElementById('prod-online');
       if (onl && stash.values.__online !== undefined) onl.checked = stash.values.__online;
+      const unl = document.getElementById('prod-unlimited');
+      if (unl) unl.checked = Boolean(stash.values.__unlimited);
       if (code) {
         const bc = document.getElementById('prod-barcode');
         if (bc) bc.value = code;
@@ -5556,11 +5594,61 @@
           <div id="prod-image-box" data-edit-id="${escapeHtml(editId || '')}" class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200">
             ${renderProductImagePickerInner(getProductImageDraftSrc(editId))}
           </div>
+          <div id="prod-extra-images" data-edit-id="${escapeHtml(editId || '')}" class="mt-1.5">${renderExtraImagesInner(editId)}</div>
         </div>
       `;
     }
 
+    // ---- Qo'shimcha rasmlar (onlayn katalog galereyasi uchun, 2 ta) ----
+    let extraImageDrafts = {};
+    function getExtraImageSrc(editId, n) {
+      const d = extraImageDrafts[n];
+      if (d === null) return '';
+      if (typeof d === 'string') return d;
+      return editId ? (imgCache.get('p_' + editId + '__' + n) || '') : '';
+    }
+    function renderExtraImagesInner(editId) {
+      return `
+        <div class="flex items-center gap-2">
+          ${[1, 2].map(n => {
+            const src = getExtraImageSrc(editId, n);
+            return `
+              <div class="relative w-14 h-14 rounded-xl bg-slate-100 border border-dashed border-slate-300 overflow-hidden shrink-0">
+                ${src ? `<img src="${src}" alt="" class="w-full h-full object-cover" />
+                  <button type="button" onclick="removeExtraImage(${n})" class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-white/90 text-red-600 text-[10px] font-black">✕</button>`
+                : `<label class="w-full h-full flex items-center justify-center text-slate-400 text-lg cursor-pointer">+<input type="file" accept="image/*" onchange="handleExtraImageSelected(event, ${n})" class="hidden" /></label>`}
+              </div>`;
+          }).join('')}
+          <p class="text-[10.5px] text-slate-400 leading-snug">Qo'shimcha rasmlar (ixtiyoriy) — Telegram katalogida galereya bo'lib ko'rinadi</p>
+        </div>`;
+    }
+    function refreshExtraImages() {
+      const box = document.getElementById('prod-extra-images');
+      if (box) box.innerHTML = renderExtraImagesInner(box.dataset.editId || '');
+    }
+    async function handleExtraImageSelected(e, n) {
+      const file = e.target?.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        extraImageDrafts[n] = await fileToResizedDataUrl(file, 480, 'image/jpeg', 0.8, '#ffffff');
+        refreshExtraImages();
+      } catch (err) {
+        showToast(err.message || "Rasmni yuklab bo'lmadi", 'error');
+      }
+    }
+    function removeExtraImage(n) {
+      extraImageDrafts[n] = null;
+      refreshExtraImages();
+    }
+
     async function commitProductImageDraft(productId) {
+      for (const n of [1, 2]) {
+        const d = extraImageDrafts[n];
+        if (d === null) await imgDel('p_' + productId + '__' + n);
+        else if (typeof d === 'string') await imgPut('p_' + productId + '__' + n, d);
+      }
+      extraImageDrafts = {};
       if (productImageDraft === undefined) return;
       if (productImageDraft === null) await imgDel('p_' + productId);
       else await imgPut('p_' + productId, productImageDraft);
@@ -6171,7 +6259,11 @@
           price: Number(p.price) || 0,
           stock: Math.max(0, Number(p.qty) || 0),
           active: true,
-          img_hash: imgHashFor('p_' + p.id)
+          img_hash: imgHashFor('p_' + p.id),
+          description: p.description || '',
+          old_price: Number(p.oldPrice) > Number(p.price) ? Number(p.oldPrice) : 0,
+          unlimited: Boolean(p.unlimited),
+          extra_hashes: [imgHashFor('p_' + p.id + '__1'), imgHashFor('p_' + p.id + '__2')]
         }));
       return {
         products,
@@ -6195,10 +6287,12 @@
       try {
         const res = await onlineFetch('/api/admin/sync', { method: 'POST', body: payload, timeout: 60000 });
         let uploaded = 0;
-        for (const pid of res.need_images || []) {
-          const data = imgCache.get('p_' + pid);
+        const needList = Array.isArray(res.need_images_v2) ? res.need_images_v2 : (res.need_images || []).map(id => ({ id, n: 0 }));
+        for (const it of needList) {
+          const key = 'p_' + it.id + (it.n ? '__' + it.n : '');
+          const data = imgCache.get(key);
           if (!data) continue;
-          await onlineFetch('/api/admin/image/' + encodeURIComponent(pid), { method: 'PUT', body: { hash: imgHashFor('p_' + pid), data }, timeout: 60000 });
+          await onlineFetch('/api/admin/image/' + encodeURIComponent(it.id) + (it.n ? '?n=' + it.n : ''), { method: 'PUT', body: { hash: imgHashFor(key), data }, timeout: 60000 });
           uploaded++;
         }
         if (res.need_logo && imgCache.get(LOGO_KEY)) {
@@ -6629,6 +6723,552 @@
         if (box) box.innerHTML = `<span class="text-red-600 font-bold">⚠️ ${escapeHtml(err.message)}</span>`;
         return false;
       }
+    }
+
+    // =========================================================================
+    // 15e. 🔑 ONLAYN DO'KON SOZLAMALARI (eski botdagi barcha sozlamalar shu yerda)
+    // =========================================================================
+    const shopCfg = { data: null, loading: false };
+
+    async function loadShopCfg(force = false) {
+      if (shopCfg.data && !force) return shopCfg.data;
+      shopCfg.data = await onlineFetch('/api/admin/settings');
+      return shopCfg.data;
+    }
+
+    function cfgBackBtn(to = 'openShopSettings()') {
+      return `<button type="button" onclick="${to}" class="mb-1 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-extrabold">← Orqaga</button>`;
+    }
+
+    function cfgRow(icon, color, title, value, onclick, valueCls = 'text-slate-400') {
+      return `
+        <button type="button" onclick="${onclick}" class="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-slate-50">
+          <span class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style="background:${color}">${icon}</span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-sm font-bold text-slate-900 truncate">${title}</span>
+          </span>
+          <span class="text-xs font-bold ${valueCls} shrink-0 max-w-[45%] truncate">${value}</span>
+          <span class="text-slate-300 text-lg">›</span>
+        </button>`;
+    }
+
+    async function openShopSettings() {
+      if (!guardOwnerAction("Do'kon sozlamalari faqat Egasi uchun")) return;
+      if (!onlineReady()) {
+        openOnlineSettingsModal();
+        showToast("Avval serverga ulaning", 'info');
+        return;
+      }
+      openAppModal("🔑 Onlayn do'kon sozlamalari", `<div class="py-10 text-center text-xs text-slate-400 font-bold">Yuklanmoqda...</div>`);
+      let d;
+      try {
+        d = await loadShopCfg(true);
+      } catch (err) {
+        openAppModal("🔑 Onlayn do'kon sozlamalari", `
+          <div class="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold">⚠️ ${escapeHtml(err.message)}</div>
+          <button type="button" onclick="openShopSettings()" class="w-full py-2.5 rounded-xl bg-slate-100 text-xs font-extrabold">Qayta urinish</button>
+          <button type="button" onclick="openOnlineSettingsModal()" class="w-full py-2.5 rounded-xl bg-violet-50 text-[#5b3df5] text-xs font-extrabold">🌐 Server ulanishi</button>`);
+        return;
+      }
+      const si = d.shop_info || {};
+      const activePromos = (d.promos || []).filter(p => p.active).length;
+      const bot = d.bot || onlineCfg().bot || '';
+      const b = d.broadcast || {};
+      openAppModal("🔑 Onlayn do'kon sozlamalari", `
+        <div class="space-y-3">
+          ${bot ? `
+            <button type="button" onclick="openExternalUrl('https://t.me/${escapeHtml(bot)}')" class="w-full p-3 rounded-2xl bg-gradient-to-r from-[#5b3df5] to-[#7c5cff] text-white flex items-center justify-between">
+              <span class="text-left"><span class="block text-[11px] text-violet-200 font-bold">Bot</span><span class="block text-sm font-black">@${escapeHtml(bot)}</span></span>
+              <span class="text-xs font-extrabold">👁️ Do'konni ko'rish →</span>
+            </button>` : ''}
+
+          <div class="text-[11px] font-black text-[#5b3df5] tracking-wide px-1">MENING DO'KONIM</div>
+          <div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            ${cfgRow('🏠', '#DBEAFE', escapeHtml(d.shop?.name || "Do'kon"), escapeHtml((si.description || 'Tavsif yo\'q').slice(0, 30)), 'openShopInfoSettings()')}
+            ${cfgRow('📞', '#DBEAFE', 'Telefonlar', `${(si.phones || []).length}/3`, 'openShopInfoSettings()')}
+            ${cfgRow('📍', '#DBEAFE', 'Manzillar', `${(si.addresses || []).length}/3`, 'openShopInfoSettings()')}
+            ${cfgRow('🖼️', '#DBEAFE', 'Bannerlar', `${(d.banners || []).length}/8`, 'openBannerSettings()', 'text-[#2F7CF6]')}
+            ${cfgRow('🚚', '#DBEAFE', 'Yetkazib berish', d.delivery?.enabled ? 'Yoqilgan' : "O'chiq", 'openDeliverySettings()', d.delivery?.enabled ? 'text-emerald-600' : 'text-slate-400')}
+            ${cfgRow('💵', '#DBEAFE', 'Minimal buyurtma summasi', d.min_order?.enabled ? formatMoney(d.min_order.amount) : "O'chiq", 'openDeliverySettings()', d.min_order?.enabled ? 'text-emerald-600' : 'text-slate-400')}
+          </div>
+
+          <div class="text-[11px] font-black text-[#5b3df5] tracking-wide px-1">MARKETING</div>
+          <div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            ${cfgRow('🏷️', '#EDE9FE', 'Promokodlar', activePromos ? `${activePromos} ta faol` : "Yo'q", 'openPromoSettings()')}
+            ${cfgRow('📣', '#EDE9FE', 'Xabar yuborish (rassilka)', b.running ? `Yuborilmoqda ${b.sent || 0}/${b.total || 0}` : 'Mijozlarga', 'openBroadcastSettings()')}
+            ${cfgRow('📢', '#EDE9FE', 'Kanal va guruhlar', `${(d.channels || []).length} ta`, 'openChannelSettings()')}
+            ${cfgRow('📊', '#EDE9FE', 'Statistika', '30 kun', 'openShopStats()')}
+          </div>
+
+          <div class="text-[11px] font-black text-emerald-700 tracking-wide px-1">ULANISH</div>
+          <div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            ${cfgRow('🌐', '#D1FAE5', 'Server va bot', 'Ulangan ✓', 'openOnlineSettingsModal()', 'text-emerald-600')}
+            ${cfgRow('🔔', '#D1FAE5', 'Telegram xabarnoma', d.admin_chat ? 'Ulangan ✓' : 'Ulanmagan', 'openAdminChatHelp()', d.admin_chat ? 'text-emerald-600' : 'text-amber-600')}
+            ${cfgRow('⬆️', '#D1FAE5', 'Katalogni yuborish', onlineCfg().lastSyncAt || 'Hali yo\'q', 'syncCatalogNow(true)')}
+          </div>
+        </div>
+      `);
+    }
+
+    function openAdminChatHelp() {
+      const bot = shopCfg.data?.bot || onlineCfg().bot || '';
+      openAppModal("🔔 Telegram xabarnoma", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          <p class="text-xs text-slate-600 leading-relaxed">Yangi buyurtmalar Telegram'ingizga ham kelishi uchun botga quyidagi buyruqni yuboring:</p>
+          <div class="p-3 rounded-2xl bg-slate-900 text-emerald-300 font-mono text-xs break-all select-all">/admin ${escapeHtml(onlineCfg().key || 'KALIT')}</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="copyText('/admin ${escapeHtml(onlineCfg().key || '')}')" class="py-2.5 rounded-xl bg-slate-100 text-xs font-extrabold">📋 Nusxalash</button>
+            ${bot ? `<button type="button" onclick="openExternalUrl('https://t.me/${escapeHtml(bot)}')" class="py-2.5 rounded-xl bg-[#5b3df5] text-white text-xs font-extrabold">Botni ochish</button>` : ''}
+          </div>
+        </div>`);
+    }
+
+    function copyText(txt) {
+      try {
+        navigator.clipboard.writeText(txt).then(() => showToast('Nusxalandi', 'success'), () => showToast('Nusxalab bo\'lmadi', 'error'));
+      } catch (_) {
+        showToast("Nusxalab bo'lmadi", 'error');
+      }
+    }
+
+    async function saveShopCfg(patch, msg = 'Saqlandi') {
+      try {
+        await onlineFetch('/api/admin/settings', { method: 'PUT', body: patch });
+        await loadShopCfg(true);
+        showToast(msg + ' ✓', 'success');
+        return true;
+      } catch (err) {
+        showToast(err.message, 'error');
+        return false;
+      }
+    }
+
+    // ---- Do'kon ma'lumoti: tavsif, telefonlar, manzillar ----
+    function openShopInfoSettings() {
+      const si = shopCfg.data?.shop_info || {};
+      const phones = [...(si.phones || [])];
+      while (phones.length < 3) phones.push('');
+      const addrs = [...(si.addresses || [])];
+      while (addrs.length < 3) addrs.push({ text: '' });
+      const inp = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm';
+      openAppModal("🏠 Do'kon ma'lumoti", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Tavsif (mijozlarga ⓘ bo'limida ko'rinadi)</label>
+            <textarea id="si-desc" rows="3" class="${inp}" placeholder="Masalan: Oziq ovqat va unga qo'shimchalar, to'rt maxsulotlari">${escapeHtml(si.description || '')}</textarea>
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-700">📞 Telefonlar (3 tagacha)</label>
+            ${phones.map((p, i) => `<input id="si-phone-${i}" type="tel" value="${escapeHtml(p)}" placeholder="+998 __ ___ __ __" class="${inp}" />`).join('')}
+          </div>
+          <div class="space-y-2">
+            <label class="block text-xs font-bold text-slate-700">📍 Manzillar (3 tagacha)</label>
+            ${addrs.map((a, i) => `
+              <div class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <input id="si-addr-${i}" type="text" value="${escapeHtml(a.text || '')}" placeholder="Masalan: Hazorasp, Xorazm viloyati" class="${inp} bg-white" />
+                <div class="grid grid-cols-[1fr_1fr_auto] gap-1.5">
+                  <input id="si-lat-${i}" type="text" inputmode="decimal" value="${a.lat ?? ''}" placeholder="Kenglik" class="px-2.5 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                  <input id="si-lng-${i}" type="text" inputmode="decimal" value="${a.lng ?? ''}" placeholder="Uzunlik" class="px-2.5 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                  <button type="button" onclick="fillMyLocation(${i})" class="px-2.5 rounded-xl bg-violet-50 text-[#5b3df5] text-xs font-extrabold">📍 Hozirgi</button>
+                </div>
+              </div>`).join('')}
+            <p class="text-[10.5px] text-slate-400">Koordinata ixtiyoriy. Kiritilsa, mijozda "Xaritada ochish" tugmasi chiqadi.</p>
+          </div>
+          <button type="button" onclick="submitShopInfo()" class="w-full py-3 rounded-xl bg-[#5b3df5] text-white text-sm font-extrabold">Saqlash</button>
+        </div>`);
+    }
+
+    function fillMyLocation(i) {
+      if (!navigator.geolocation) return showToast("Joylashuvni aniqlab bo'lmadi", 'error');
+      showToast('Joylashuv aniqlanmoqda...', 'info');
+      navigator.geolocation.getCurrentPosition(pos => {
+        const la = document.getElementById('si-lat-' + i);
+        const ln = document.getElementById('si-lng-' + i);
+        if (la) la.value = pos.coords.latitude.toFixed(6);
+        if (ln) ln.value = pos.coords.longitude.toFixed(6);
+        showToast('Joylashuv qo\'yildi', 'success');
+      }, () => showToast("Joylashuvga ruxsat berilmadi", 'error'), { enableHighAccuracy: true, timeout: 15000 });
+    }
+
+    async function submitShopInfo() {
+      const val = id => (document.getElementById(id)?.value || '').trim();
+      const phones = [0, 1, 2].map(i => val('si-phone-' + i)).filter(Boolean);
+      const addresses = [0, 1, 2].map(i => {
+        const text = val('si-addr-' + i);
+        const lat = parseFloat(val('si-lat-' + i).replace(',', '.'));
+        const lng = parseFloat(val('si-lng-' + i).replace(',', '.'));
+        return text ? { text, ...(isFinite(lat) && isFinite(lng) ? { lat, lng } : {}) } : null;
+      }).filter(Boolean);
+      if (await saveShopCfg({ shop_info: { description: val('si-desc'), phones, addresses } })) openShopSettings();
+    }
+
+    // ---- Bannerlar ----
+    function openBannerSettings() {
+      const banners = shopCfg.data?.banners || [];
+      const base = onlineCfg().url;
+      openAppModal("🖼️ Bannerlar", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          <p class="text-[11px] text-slate-500">Katalog tepasida aylanib turadigan reklama rasmlari (8 tagacha). Eng yaxshi o'lcham: 2:1 (masalan 1200×600).</p>
+          ${banners.length === 0 ? '<div class="p-6 text-center text-xs text-slate-400 font-bold rounded-2xl border border-dashed border-slate-300">Hali banner yo\'q</div>' : `
+            <div class="space-y-2">
+              ${banners.map((b, i) => `
+                <div class="p-2 rounded-2xl bg-white border border-slate-200 space-y-2">
+                  <img src="${escapeHtml(base)}/img/b/${escapeHtml(b.id)}?h=${escapeHtml(b.hash || '')}" alt="" class="w-full aspect-[2/1] object-cover rounded-xl bg-slate-100" />
+                  <div class="flex gap-1.5">
+                    <button type="button" ${i === 0 ? 'disabled' : ''} onclick="moveBanner(${i}, -1)" class="px-3 py-1.5 rounded-lg bg-slate-100 text-xs font-extrabold disabled:opacity-30">↑</button>
+                    <button type="button" ${i === banners.length - 1 ? 'disabled' : ''} onclick="moveBanner(${i}, 1)" class="px-3 py-1.5 rounded-lg bg-slate-100 text-xs font-extrabold disabled:opacity-30">↓</button>
+                    <span class="flex-1 text-[11px] text-slate-400 self-center">#${i + 1}</span>
+                    <button type="button" data-bid="${escapeHtml(b.id)}" onclick="deleteBanner(this.dataset.bid)" class="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-extrabold">O'chirish</button>
+                  </div>
+                </div>`).join('')}
+            </div>`}
+          ${banners.length < 8 ? `
+            <label class="block w-full py-3 rounded-xl bg-[#5b3df5] text-white text-sm font-extrabold text-center cursor-pointer">
+              + Banner qo'shish (galereyadan)
+              <input type="file" accept="image/*" onchange="uploadBanner(event)" class="hidden" />
+            </label>` : ''}
+        </div>`);
+    }
+
+    async function uploadBanner(e) {
+      const file = e.target?.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        showToast('Yuklanmoqda...', 'info');
+        const data = await fileToResizedDataUrl(file, 1400, 'image/jpeg', 0.85, '#ffffff');
+        await onlineFetch('/api/admin/banner/' + uid('b').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30), { method: 'PUT', body: { data }, timeout: 60000 });
+        await loadShopCfg(true);
+        showToast('Banner qo\'shildi ✓', 'success');
+        openBannerSettings();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function deleteBanner(id) {
+      openConfirmModal("Bannerni o'chirish", "Bu banner katalogdan olib tashlansinmi?", "O'chirish", async () => {
+        try {
+          await onlineFetch('/api/admin/banner/' + encodeURIComponent(id), { method: 'DELETE' });
+          await loadShopCfg(true);
+          openBannerSettings();
+        } catch (err) { showToast(err.message, 'error'); }
+      }, true);
+    }
+
+    async function moveBanner(i, dir) {
+      const ids = (shopCfg.data?.banners || []).map(b => b.id);
+      const j = i + dir;
+      if (j < 0 || j >= ids.length) return;
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      try {
+        await onlineFetch('/api/admin/banners/order', { method: 'POST', body: { order: ids } });
+        await loadShopCfg(true);
+        openBannerSettings();
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    // ---- Yetkazib berish va minimal summa ----
+    function openDeliverySettings() {
+      const d = shopCfg.data?.delivery || {};
+      const m = shopCfg.data?.min_order || {};
+      const inp = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold';
+      openAppModal("🚚 Yetkazib berish va minimal summa", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          <div class="p-3 rounded-2xl bg-white border border-slate-200 space-y-2.5">
+            <label class="flex items-center justify-between text-sm font-black text-slate-900">
+              <span>🚚 Yetkazib berish narxi</span>
+              <input id="dl-enabled" type="checkbox" ${d.enabled ? 'checked' : ''} class="w-5 h-5 accent-[#5b3df5]" />
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Narxi (so'm)</label><input id="dl-price" type="number" min="0" value="${Number(d.price) || 0}" class="${inp}" /></div>
+              <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Bepul (dan ortiq)</label><input id="dl-free" type="number" min="0" value="${Number(d.free_from) || 0}" class="${inp}" /></div>
+            </div>
+            <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Izoh (mijozga ko'rinadi)</label><input id="dl-note" type="text" value="${escapeHtml(d.note || '')}" placeholder="Masalan: Hazorasp tumani bo'ylab 1 kunda" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm" /></div>
+            <p class="text-[10.5px] text-slate-400">"Bepul" maydoni 0 bo'lsa, har doim narx olinadi.</p>
+          </div>
+          <div class="p-3 rounded-2xl bg-white border border-slate-200 space-y-2.5">
+            <label class="flex items-center justify-between text-sm font-black text-slate-900">
+              <span>💵 Minimal buyurtma summasi</span>
+              <input id="mo-enabled" type="checkbox" ${m.enabled ? 'checked' : ''} class="w-5 h-5 accent-[#5b3df5]" />
+            </label>
+            <input id="mo-amount" type="number" min="0" value="${Number(m.amount) || 0}" class="${inp}" />
+            <p class="text-[10.5px] text-slate-400">Bundan kam summada mijoz buyurtma bera olmaydi.</p>
+          </div>
+          <button type="button" onclick="submitDelivery()" class="w-full py-3 rounded-xl bg-[#5b3df5] text-white text-sm font-extrabold">Saqlash</button>
+        </div>`);
+    }
+
+    async function submitDelivery() {
+      const num = id => Math.max(0, Number(document.getElementById(id)?.value) || 0);
+      const ok = await saveShopCfg({
+        delivery: { enabled: document.getElementById('dl-enabled').checked, price: num('dl-price'), free_from: num('dl-free'), note: (document.getElementById('dl-note').value || '').trim() },
+        min_order: { enabled: document.getElementById('mo-enabled').checked, amount: num('mo-amount') }
+      });
+      if (ok) openShopSettings();
+    }
+
+    // ---- Promokodlar ----
+    function openPromoSettings() {
+      const list = shopCfg.data?.promos || [];
+      const now = Date.now() / 1000;
+      openAppModal("🏷️ Promokodlar", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          ${list.length === 0 ? '<div class="p-5 text-center text-xs text-slate-400 font-bold rounded-2xl border border-dashed border-slate-300">Promokodlar yo\'q</div>' : `
+            <div class="space-y-2">
+              ${list.map(p => {
+                const expired = p.expires_at && now > p.expires_at;
+                const full = p.usage_limit && p.used_count >= p.usage_limit;
+                return `
+                  <div class="p-3 rounded-2xl bg-white border ${p.active && !expired && !full ? 'border-emerald-200' : 'border-slate-200 opacity-70'} space-y-1">
+                    <div class="flex items-center justify-between">
+                      <span class="font-mono text-sm font-black text-slate-900">${escapeHtml(p.code)}</span>
+                      <span class="text-sm font-black text-[#5b3df5]">−${p.kind === 'percent' ? p.value + '%' : formatMoney(p.value)}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500">
+                      Ishlatilgan: ${p.used_count}${p.usage_limit ? '/' + p.usage_limit : ''}
+                      ${p.min_sum ? ' • min ' + formatMoney(p.min_sum) : ''}
+                      ${p.expires_at ? ' • ' + (expired ? '<span class="text-red-600">muddati tugagan</span>' : 'gacha ' + new Date(p.expires_at * 1000).toLocaleDateString()) : ''}
+                    </div>
+                    <div class="flex gap-1.5 pt-1">
+                      <button type="button" data-code="${escapeHtml(p.code)}" onclick="togglePromo(this.dataset.code)" class="px-2.5 py-1 rounded-lg ${p.active ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700'} text-[11px] font-extrabold">${p.active ? "To'xtatish" : 'Yoqish'}</button>
+                      <button type="button" data-code="${escapeHtml(p.code)}" onclick="deletePromo(this.dataset.code)" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-extrabold">O'chirish</button>
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>`}
+          <div class="p-3 rounded-2xl bg-violet-50/60 border border-violet-200 space-y-2">
+            <div class="text-xs font-black text-slate-900">+ Yangi promokod</div>
+            <input id="pr-code" type="text" placeholder="KOD (masalan YANGI10)" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase bg-white" />
+            <div class="grid grid-cols-2 gap-2">
+              <select id="pr-kind" class="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white">
+                <option value="percent">Foiz (%)</option>
+                <option value="fixed">Summa (so'm)</option>
+              </select>
+              <input id="pr-value" type="number" min="1" placeholder="Qiymati" class="px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold bg-white" />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Min. summa</label><input id="pr-min" type="number" min="0" value="0" class="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs bg-white" /></div>
+              <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Limit (0=∞)</label><input id="pr-limit" type="number" min="0" value="0" class="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs bg-white" /></div>
+              <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Kun (0=∞)</label><input id="pr-days" type="number" min="0" value="0" class="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs bg-white" /></div>
+            </div>
+            <button type="button" onclick="submitPromo()" class="w-full py-2.5 rounded-xl bg-[#5b3df5] text-white text-xs font-extrabold">Yaratish</button>
+          </div>
+        </div>`);
+    }
+
+    async function submitPromo() {
+      const v = id => document.getElementById(id)?.value;
+      try {
+        const r = await onlineFetch('/api/admin/promo', { method: 'PUT', body: {
+          code: (v('pr-code') || '').trim(), kind: v('pr-kind'), value: Number(v('pr-value')) || 0,
+          min_sum: Number(v('pr-min')) || 0, usage_limit: Number(v('pr-limit')) || 0, expires_days: Number(v('pr-days')) || 0, active: true
+        } });
+        shopCfg.data.promos = r.promos;
+        showToast('Promokod yaratildi ✓', 'success');
+        openPromoSettings();
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    async function togglePromo(code) {
+      const p = (shopCfg.data?.promos || []).find(x => x.code === code);
+      if (!p) return;
+      try {
+        const r = await onlineFetch('/api/admin/promo', { method: 'PUT', body: { ...p, expires_days: 0, expires_at: p.expires_at || 0, active: !p.active } });
+        shopCfg.data.promos = r.promos;
+        openPromoSettings();
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    function deletePromo(code) {
+      openConfirmModal("Promokodni o'chirish", `"${code}" o'chirilsinmi?`, "O'chirish", async () => {
+        try {
+          const r = await onlineFetch('/api/admin/promo/' + encodeURIComponent(code), { method: 'DELETE' });
+          shopCfg.data.promos = r.promos;
+          openPromoSettings();
+        } catch (err) { showToast(err.message, 'error'); }
+      }, true);
+    }
+
+    // ---- Xabar yuborish (rassilka) ----
+    let broadcastImage = null;
+    function openBroadcastSettings() {
+      const b = shopCfg.data?.broadcast || {};
+      broadcastImage = null;
+      openAppModal("📣 Mijozlarga xabar yuborish", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          <p class="text-[11px] text-slate-500">Botda ro'yxatdan o'tgan barcha mijozlarga xabar yuboriladi: yangi mahsulot, chegirma, aksiya va boshqalar.</p>
+          ${b.total ? `
+            <div id="bc-status" class="p-3 rounded-2xl ${b.running ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'} border text-xs space-y-0.5">
+              <div class="font-black">${b.running ? '⏳ Yuborilmoqda...' : '✓ Oxirgi xabar'}</div>
+              <div>Yuborildi: <b>${b.sent || 0}</b> / ${b.total} ${b.failed ? `• xato: ${b.failed}` : ''}</div>
+              <div class="text-slate-400 truncate">"${escapeHtml(b.text || '')}"</div>
+            </div>` : ''}
+          <textarea id="bc-text" rows="5" maxlength="1000" placeholder="Masalan: 🔥 Nutella 3kg chelak endi 430 000 so'm! Faqat shu hafta." class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm"></textarea>
+          <div id="bc-img-box"></div>
+          <label class="block w-full py-2.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-extrabold text-center cursor-pointer">
+            🖼️ Rasm qo'shish (ixtiyoriy)
+            <input type="file" accept="image/*" onchange="pickBroadcastImage(event)" class="hidden" />
+          </label>
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold">
+            <span>"🛒 Katalogni ochish" tugmasini qo'shish</span>
+            <input id="bc-btn" type="checkbox" checked class="w-4 h-4 accent-[#5b3df5]" />
+          </label>
+          <button type="button" onclick="confirmBroadcast()" class="w-full py-3 rounded-xl bg-[#5b3df5] text-white text-sm font-extrabold">📣 Yuborish</button>
+        </div>`);
+    }
+
+    async function pickBroadcastImage(e) {
+      const file = e.target?.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        broadcastImage = await fileToResizedDataUrl(file, 1280, 'image/jpeg', 0.85, '#ffffff');
+        const box = document.getElementById('bc-img-box');
+        if (box) box.innerHTML = `<div class="relative"><img src="${broadcastImage}" class="w-full rounded-2xl border border-slate-200" /><button type="button" onclick="broadcastImage=null; document.getElementById('bc-img-box').innerHTML='';" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 font-black">✕</button></div>`;
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    function confirmBroadcast() {
+      const text = (document.getElementById('bc-text')?.value || '').trim();
+      if (!text) return showToast('Xabar matnini yozing', 'error');
+      const withBtn = document.getElementById('bc-btn')?.checked;
+      const img = broadcastImage;
+      openConfirmModal("Xabarni yuborish", `Bu xabar botdagi barcha mijozlarga yuboriladi. Davom etamizmi?\n\n"${text.slice(0, 120)}"`, "Ha, yuborish", async () => {
+        try {
+          const r = await onlineFetch('/api/admin/broadcast', { method: 'POST', body: { text, image: img || undefined, button: withBtn ? '🛒 Katalogni ochish' : '' }, timeout: 60000 });
+          showToast(`${r.total} ta mijozga yuborilmoqda...`, 'success');
+          setTimeout(async () => { await loadShopCfg(true).catch(() => {}); }, 3000);
+          openShopSettings();
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    }
+
+    // ---- Kanal va guruhlar + mahsulotni joylash ----
+    function openChannelSettings() {
+      const chans = [...(shopCfg.data?.channels || [])];
+      const bot = shopCfg.data?.bot || onlineCfg().bot || '';
+      openAppModal("📢 Kanal va guruhlar", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
+            1. ${bot ? '@' + escapeHtml(bot) : 'Botni'} kanal yoki guruhingizga <b>admin</b> qilib qo'shing.<br>
+            2. Pastga kanal manzilini yozing: <b>@kanal_nomi</b> (yopiq kanal/guruh uchun <b>-100...</b> ID).<br>
+            3. Omborda mahsulot yonidagi <b>📢</b> tugmasi orqali uni kanalga rasm, narx va "Buyurtma berish" tugmasi bilan joylaysiz.
+          </div>
+          <div id="ch-list" class="space-y-2">
+            ${chans.map((c, i) => `
+              <div class="flex gap-1.5">
+                <input id="ch-chat-${i}" type="text" value="${escapeHtml(c.chat)}" placeholder="@kanal" class="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono" />
+                <input id="ch-title-${i}" type="text" value="${escapeHtml(c.title || '')}" placeholder="Nomi" class="w-28 px-3 py-2.5 rounded-xl border border-slate-200 text-xs" />
+              </div>`).join('')}
+            <div class="flex gap-1.5">
+              <input id="ch-chat-${chans.length}" type="text" placeholder="@yangi_kanal" class="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono" />
+              <input id="ch-title-${chans.length}" type="text" placeholder="Nomi" class="w-28 px-3 py-2.5 rounded-xl border border-slate-200 text-xs" />
+            </div>
+          </div>
+          <p class="text-[10.5px] text-slate-400">O'chirish uchun maydonni bo'shating va saqlang.</p>
+          <button type="button" onclick="submitChannels(${chans.length + 1})" class="w-full py-3 rounded-xl bg-[#5b3df5] text-white text-sm font-extrabold">Saqlash</button>
+        </div>`);
+    }
+
+    async function submitChannels(n) {
+      const channels = [];
+      for (let i = 0; i < n; i++) {
+        const chat = (document.getElementById('ch-chat-' + i)?.value || '').trim();
+        const title = (document.getElementById('ch-title-' + i)?.value || '').trim();
+        if (chat) channels.push({ chat, title: title || chat });
+      }
+      if (await saveShopCfg({ channels })) openShopSettings();
+    }
+
+    async function openPostProductModal(productId) {
+      if (!guardOwnerAction("Kanalga joylash faqat Egasi uchun")) return;
+      if (!onlineReady()) return showToast("Avval onlayn do'konni ulang", 'error');
+      const prod = appState.products.find(p => p.id === productId);
+      if (!prod) return;
+      if (prod.online === false) return showToast("Bu tovar onlayn katalogda yashirilgan", 'error');
+      try { await loadShopCfg(); } catch (err) { return showToast(err.message, 'error'); }
+      const chans = shopCfg.data?.channels || [];
+      if (!chans.length) {
+        showToast("Avval kanal yoki guruh qo'shing", 'info');
+        openShopSettings().then(() => openChannelSettings());
+        return;
+      }
+      const img = getProductImage(prod.id);
+      openAppModal("📢 Kanalga joylash", `
+        <div class="space-y-3">
+          <div class="p-3 rounded-2xl bg-white border border-slate-200 flex gap-3">
+            ${img ? `<img src="${img}" class="w-16 h-16 rounded-xl object-cover" />` : '<div class="w-16 h-16 rounded-xl bg-slate-100"></div>'}
+            <div class="min-w-0">
+              <div class="text-sm font-black text-slate-900">${escapeHtml(prod.name)}</div>
+              <div class="text-sm font-black text-[#5b3df5]">${formatMoney(prod.price)} ${Number(prod.oldPrice) > Number(prod.price) ? `<s class="text-xs text-slate-400">${formatMoney(prod.oldPrice)}</s>` : ''}</div>
+              ${prod.description ? `<div class="text-[11px] text-slate-500 line-clamp-2">${escapeHtml(prod.description)}</div>` : ''}
+            </div>
+          </div>
+          <div class="text-xs font-bold text-slate-600">Qayerga joylaymiz?</div>
+          ${chans.map(c => `
+            <button type="button" data-chat="${escapeHtml(c.chat)}" onclick="postProductTo('${escapeHtml(prod.id)}', this.dataset.chat)" class="w-full py-3 rounded-xl bg-[#5b3df5] text-white text-sm font-extrabold">
+              📢 ${escapeHtml(c.title || c.chat)}
+            </button>`).join('')}
+        </div>`);
+    }
+
+    async function postProductTo(productId, chat) {
+      try {
+        showToast('Yuborilmoqda...', 'info');
+        if (catalogChanged()) await syncCatalogNow(false);
+        await onlineFetch('/api/admin/post', { method: 'POST', body: { product_id: productId, chat }, timeout: 60000 });
+        closeAppModal();
+        showToast('Kanalga joylandi ✓', 'success');
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    // ---- Statistika ----
+    async function openShopStats(days = 30) {
+      openAppModal("📊 Onlayn do'kon statistikasi", `<div class="py-10 text-center text-xs text-slate-400 font-bold">Yuklanmoqda...</div>`);
+      let s;
+      try { s = await onlineFetch('/api/admin/stats?days=' + days); }
+      catch (err) { return openAppModal("📊 Statistika", `${cfgBackBtn()}<div class="p-3 rounded-2xl bg-red-50 text-red-700 text-xs font-bold">${escapeHtml(err.message)}</div>`); }
+      const maxDay = Math.max(1, ...s.daily.map(d => d.sum || 0));
+      const tile = (label, val, cls = 'text-slate-900') => `<div class="p-3 rounded-2xl bg-white border border-slate-200"><div class="text-[10.5px] font-bold text-slate-500">${label}</div><div class="text-base font-black ${cls} mt-0.5">${val}</div></div>`;
+      openAppModal("📊 Onlayn do'kon statistikasi", `
+        <div class="space-y-3">
+          ${cfgBackBtn()}
+          <div class="grid grid-cols-4 gap-1 p-1 rounded-xl bg-slate-100">
+            ${[7, 30, 90, 365].map(d => `<button type="button" onclick="openShopStats(${d})" class="py-1.5 rounded-lg text-xs font-extrabold ${d === days ? 'bg-white text-[#5b3df5] shadow-sm' : 'text-slate-500'}">${d === 365 ? '1 yil' : d + ' kun'}</button>`).join('')}
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            ${tile('Tushum', formatMoney(s.revenue), 'text-[#5b3df5]')}
+            ${tile('Buyurtmalar', s.orders + (s.cancelled ? ` <span class="text-xs text-red-500">(${s.cancelled} bekor)</span>` : ''))}
+            ${tile("O'rtacha chek", formatMoney(s.avg))}
+            ${tile('Xaridorlar', `${s.buyers} <span class="text-xs text-slate-400">/ ${s.customers_all}</span>`)}
+          </div>
+          <div class="p-3 rounded-2xl bg-white border border-slate-200">
+            <div class="text-xs font-black text-slate-900 mb-2">Kunlik tushum</div>
+            ${s.daily.length ? `
+              <div class="flex items-end gap-[2px] h-28">
+                ${s.daily.map(d => `<div title="${d.day}: ${formatMoney(d.sum)}" class="flex-1 rounded-t bg-[#5b3df5]" style="height:${Math.max(3, Math.round((d.sum || 0) / maxDay * 100))}%"></div>`).join('')}
+              </div>
+              <div class="flex justify-between text-[10px] text-slate-400 mt-1"><span>${s.daily[0].day}</span><span>${s.daily[s.daily.length - 1].day}</span></div>
+            ` : '<div class="text-xs text-slate-400">Hali buyurtma yo\'q</div>'}
+          </div>
+          <div class="p-3 rounded-2xl bg-white border border-slate-200">
+            <div class="text-xs font-black text-slate-900 mb-1">🏆 Eng ko'p sotilgan</div>
+            ${s.top_products.length ? s.top_products.map((p, i) => `<div class="flex justify-between text-xs py-1.5 border-b border-slate-100 last:border-0"><span class="truncate pr-2">${i + 1}. ${escapeHtml(p.name)} <span class="text-slate-400">× ${p.qty}</span></span><b class="shrink-0">${formatMoney(p.sum)}</b></div>`).join('') : '<div class="text-xs text-slate-400">—</div>'}
+          </div>
+          <div class="p-3 rounded-2xl bg-white border border-slate-200">
+            <div class="text-xs font-black text-slate-900 mb-1">👥 Faol mijozlar</div>
+            ${s.top_customers.length ? s.top_customers.map((c, i) => `<div class="flex justify-between text-xs py-1.5 border-b border-slate-100 last:border-0"><span class="truncate pr-2">${i + 1}. ${escapeHtml(c.name)} <span class="text-slate-400">${escapeHtml(c.phone || '')} • ${c.orders} ta</span></span><b class="shrink-0">${formatMoney(c.sum)}</b></div>`).join('') : '<div class="text-xs text-slate-400">—</div>'}
+          </div>
+          <div class="text-[11px] text-slate-500 text-center">Yangi mijozlar: ${s.customers_new} • Jami ro'yxatdan o'tgan: ${s.customers_all}</div>
+        </div>`);
     }
 
     // =========================================================================
