@@ -1,3 +1,6 @@
-data/
-__pycache__/
-*.db
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
